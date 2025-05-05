@@ -7,7 +7,7 @@
 
 Rails.application.config.middleware.insert_before 0, Rack::Cors do
   allow do
-    origins "http://localhost:3000", "http://https://press-start-beta.vercel.app/"  # use http, not https
+    origins "http://localhost:3000", "https://press-start-beta.vercel.app"  # use http, not https
 
     resource "*",
       headers: :any,
