@@ -17,10 +17,11 @@ class GamesController < ApplicationController
     request["Authorization"] = "bearer #{token}"
     request["Content-Type"] = "text/plain"
     request.body = <<~BODY
-    fields name, total_rating_count, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name;
-    where first_release_date > #{(Time.now - 14.days).to_i};
-    sort rating asc;
-    limit 6;
+    fields name, hypes, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name;
+    where first_release_date > #{(Time.now - 30.days).to_i}
+      & hypes != null;
+    sort hypes desc;
+    limit 12;
   BODY
 
     response = http.request(request)
