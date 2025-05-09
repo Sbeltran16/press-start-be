@@ -26,4 +26,7 @@ Rails.application.routes.draw do
   get '/api/top_games', to: 'games#top'
   get 'api/games', to: 'games#show_by_name'
 
+   # New route for searching games
+   get '/api/games/search', to: 'games#search_by_name'
+
 end
