@@ -71,7 +71,26 @@ class GamesController < ApplicationController
     request["Authorization"] = "Bearer #{token}"
     request["Content-Type"] = "text/plain"
     request.body = <<~BODY
-      fields name, cover.image_id, summary, rating, genres.name, first_release_date, artworks.image_id, platforms, release_dates, screenshots.image_id, storyline, videos.video_id, videos.name, involved_companies.company.name;
+      fields name,
+      cover.image_id,
+      summary,
+      rating,
+      aggregated_rating,
+      first_release_date,
+      storyline,
+      genres.name,
+      platforms.name,
+      release_dates.human,
+      artworks.image_id,
+      screenshots.image_id,
+      videos.video_id,
+      videos.name,
+      involved_companies.company.name,
+      similar_games.name,
+      similar_games.cover.image_id,
+      similar_games.first_release_date,
+      age_ratings.rating,
+      age_ratings.category;
       search "#{decoded_name}";
       limit 1;
     BODY
