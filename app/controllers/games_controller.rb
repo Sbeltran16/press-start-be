@@ -1,4 +1,5 @@
 class GamesController < ApplicationController
+  skip_before_action :authenticate_user!
   require 'net/http'
   require 'json'
 
@@ -30,9 +31,9 @@ class GamesController < ApplicationController
     request["Content-Type"] = "text/plain"
     request.body = <<~BODY
     fields name, hypes, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name;
-    where first_release_date > #{(Time.now - 30.days).to_i}
+    where first_release_date > #{(Time.now - 14.days).to_i}
       & hypes != null;
-    sort hypes desc;
+    sort rating: desc ;
     limit 12;
   BODY
 
