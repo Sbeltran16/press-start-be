@@ -79,7 +79,6 @@ test:
 #
 production:
   <<: *default
-  database: pressstart_db
-  username: <%= ENV["DATABASE_USERNAME"] %>
-  password: <%= ENV["DATABASE_PASSWORD"] %>
-  host: <%= ENV["DATABASE_HOST"] %>
+  database: press_start_be_production
+  username: press_start_be
+  password: <%= ENV["PRESS_START_BE_DATABASE_PASSWORD"] %>
