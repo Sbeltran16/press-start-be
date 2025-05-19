@@ -1,4 +1,6 @@
 class UsersController < ApplicationController
+  before_action :authenticate_user!, only: [:me]
+
   def me
     if current_user
       render json: {
