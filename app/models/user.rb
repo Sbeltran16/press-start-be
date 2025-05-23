@@ -1,6 +1,4 @@
 class User < ApplicationRecord
-  # Include default devise modules. Others available are:
-  # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
   include Devise::JWT::RevocationStrategies::JTIMatcher
 
   devise :database_authenticatable, :registerable, :validatable,
@@ -8,4 +6,10 @@ class User < ApplicationRecord
 
   validates :username, presence: true, uniqueness: true
   validates :bio, length: { maximum: 500 }
+
+  #User Reviews Relations
+  has_many :reviews
+  has_many :review_likes
+  has_many :review_comments
+
 end

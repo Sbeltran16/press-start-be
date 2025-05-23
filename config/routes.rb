@@ -33,4 +33,12 @@ Rails.application.routes.draw do
    # New route for searching games
    get '/api/games/search', to: 'games#search_by_name'
 
+
+   # Rewiews Routes
+   resources :reviews do
+    resources :review_comments, only: [:create, :destroy]
+    post 'like', to: 'review_likes#create'
+    delete 'unlike', to: 'review_likes#destroy'
+   end
+
 end
