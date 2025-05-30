@@ -10,9 +10,27 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_29_101913) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_30_114606) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "game_likes", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "igdb_game_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "igdb_game_id"], name: "index_game_likes_on_user_id_and_igdb_game_id", unique: true
+    t.index ["user_id"], name: "index_game_likes_on_user_id"
+  end
+
+  create_table "game_plays", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "igdb_game_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "igdb_game_id"], name: "index_game_plays_on_user_id_and_igdb_game_id", unique: true
+    t.index ["user_id"], name: "index_game_plays_on_user_id"
+  end
 
   create_table "ratings", force: :cascade do |t|
     t.bigint "user_id", null: false
@@ -71,6 +89,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_29_101913) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
+  add_foreign_key "game_likes", "users"
+  add_foreign_key "game_plays", "users"
   add_foreign_key "ratings", "users"
   add_foreign_key "review_comments", "reviews"
   add_foreign_key "review_comments", "users"

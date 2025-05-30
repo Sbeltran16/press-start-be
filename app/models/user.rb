@@ -14,4 +14,14 @@ class User < ApplicationRecord
 
   #User Ratings Relations
   has_many :ratings
+
+  #User Game Interactions
+    #Game Likes
+    has_many :game_likes, dependent: :destroy
+    has_many :liked_games, through: :game_likes, source: :igdb_game
+
+    #Game Plays
+    has_many :game_plays, dependent: :destroy
+    has_many :played_games, through: :game_plays, source: :igdb_game
+
 end

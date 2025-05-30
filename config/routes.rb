@@ -17,21 +17,27 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Current User
-  get "/me", to: "users#me"
-
-  #User routes
-
-
   # Defines the root path route ("/")
   # root "posts#index"
 
-  #API routes
-  get '/api/top_games', to: 'games#top'
-  get '/api/games', to: 'games#show_by_name'
+  #User routes
+  get "/me", to: "users#me"
 
-  # New route for searching games
-  get '/api/games/search', to: 'games#search_by_name'
+  #API Routes
+  namespace :api do
+    #Game Interaction Routes
+    post 'game_likes', to: 'game_likes#create'
+    delete 'game_likes', to: 'game_likes#destroy_by_igdb'
+
+    post 'game_plays', to: 'game_plays#create'
+    delete 'game_plays', to: 'game_plays#destroy_by_igdb'
+
+    #Game Routes
+    get 'top_games', to: 'games#top'
+    get 'games', to: 'games#show_by_name'
+    get 'user_game_status', to: 'games#user_game_status'
+    get 'games/search', to: 'games#search_by_name'
+  end
 
   # Rewiews Routes
   resources :reviews do

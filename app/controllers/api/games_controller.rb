@@ -1,10 +1,18 @@
-class GamesController < ApplicationController
-  skip_before_action :authenticate_user!
+class Api::GamesController < ApplicationController
+  before_action :authenticate_user!, only: [:user_game_status]
   require 'net/http'
   require 'json'
 
   CLIENT_ID = ENV['TWITCH_CLIENT_ID']
   CLIENT_SECRET = ENV['TWITCH_CLIENT_SECRET']
+
+  def user_game_status
+    igdb_game_id = params[:igdb_game_id]
+    liked = current_user.game_likes.exists?(igdb_game_id: igdb_game_id)
+    played = current_user.game_plays.exists?(igdb_game_id: igdb_game_id)
+
+    render json: { liked: liked, played: played }
+  end
 
  # Game Index
   def index
