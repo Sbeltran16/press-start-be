@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_05_30_114606) do
+ActiveRecord::Schema[7.1].define(version: 2025_05_31_111056) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -30,6 +30,14 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_30_114606) do
     t.datetime "updated_at", null: false
     t.index ["user_id", "igdb_game_id"], name: "index_game_plays_on_user_id_and_igdb_game_id", unique: true
     t.index ["user_id"], name: "index_game_plays_on_user_id"
+  end
+
+  create_table "game_views", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "igdb_game_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id"], name: "index_game_views_on_user_id"
   end
 
   create_table "ratings", force: :cascade do |t|
@@ -91,6 +99,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_05_30_114606) do
 
   add_foreign_key "game_likes", "users"
   add_foreign_key "game_plays", "users"
+  add_foreign_key "game_views", "users"
   add_foreign_key "ratings", "users"
   add_foreign_key "review_comments", "reviews"
   add_foreign_key "review_comments", "users"

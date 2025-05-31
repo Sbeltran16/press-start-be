@@ -25,7 +25,62 @@ class Api::GamesController < ApplicationController
     render json: @games
   end
 
-  # Top Popular Games
+
+  def popular
+    # Calculate scores from your tables
+    views = GameView.group(:igdb_game_id).count
+    likes = GameLike.group(:igdb_game_id).count
+    plays = GamePlay.group(:igdb_game_id).count
+    reviews = Review.group(:igdb_game_id).count
+  
+    game_scores = Hash.new(0)
+  
+    views.each { |game_id, count| game_scores[game_id] += count * 1 }
+    likes.each { |game_id, count| game_scores[game_id] += count * 2 }
+    plays.each { |game_id, count| game_scores[game_id] += count * 3 }
+    reviews.each { |game_id, count| game_scores[game_id] += count * 4 }
+
+    # Top game IDs sorted by score
+    top_game_ids = game_scores.sort_by { |_, score| -score }.map(&:first).take(12)
+
+    # Fetch IGDB game details for those IDs
+    token = fetch_access_token # Your method to get Twitch IGDB token
+
+    uri = URI("https://api.igdb.com/v4/games")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = CLIENT_ID
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+
+    request.body = <<~BODY
+      fields id, name, cover.image_id,  artworks.image_id, rating, summary;
+      where id = (#{top_game_ids.join(",")});
+      limit 12;
+    BODY
+
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      games = JSON.parse(response.body)
+
+      # Add the score for each game from your hash
+      games_with_scores = games.map do |game|
+        game["score"] = game_scores[game["id"]]
+        game
+      end
+
+      render json: games_with_scores
+    else
+      render json: { error: "Failed to fetch games", status: response.code, response_body: response.body }, status: :bad_request
+    end
+  end
+  
+
+
+  # Top Games
   def top
     token = fetch_access_token
 
@@ -38,10 +93,8 @@ class Api::GamesController < ApplicationController
     request["Authorization"] = "bearer #{token}"
     request["Content-Type"] = "text/plain"
     request.body = <<~BODY
-    fields name, hypes, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name;
-    where first_release_date > #{(Time.now - 14.days).to_i}
-      & hypes != null;
-    sort rating: desc ;
+    fields name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name;
+    where id = (#{top_game_ids.join(",")});
     limit 12;
   BODY
 
