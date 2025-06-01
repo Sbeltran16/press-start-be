@@ -35,9 +35,10 @@ Rails.application.routes.draw do
     #Game Routes
     get 'top_games', to: 'games#top'
     get 'games', to: 'games#show_by_name'
+    get 'games/search', to: 'games#search_by_name'
     get 'popular', to: 'games#popular'
     get 'user_game_status', to: 'games#user_game_status'
-    get 'games/search', to: 'games#search_by_name'
+    get 'games/:id', to: 'games#show_by_id'
   end
 
   # Rewiews Routes

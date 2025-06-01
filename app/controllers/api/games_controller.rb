@@ -32,9 +32,9 @@ class Api::GamesController < ApplicationController
     likes = GameLike.group(:igdb_game_id).count
     plays = GamePlay.group(:igdb_game_id).count
     reviews = Review.group(:igdb_game_id).count
-  
+
     game_scores = Hash.new(0)
-  
+
     views.each { |game_id, count| game_scores[game_id] += count * 1 }
     likes.each { |game_id, count| game_scores[game_id] += count * 2 }
     plays.each { |game_id, count| game_scores[game_id] += count * 3 }
@@ -77,7 +77,6 @@ class Api::GamesController < ApplicationController
       render json: { error: "Failed to fetch games", status: response.code, response_body: response.body }, status: :bad_request
     end
   end
-  
 
 
   # Top Games
@@ -216,6 +215,17 @@ def search_by_name
   end
 end
 
+def show_by_id
+  igdb_game_id = params[:id]
+
+  game = fetch_game_from_igdb(igdb_game_id)
+
+  if game
+    render json: game
+  else
+    render json: { error: "Game not found" }, status: :not_found
+  end
+end
 
   private
   def fetch_access_token
@@ -237,5 +247,53 @@ end
     Rails.logger.debug("Twitch Token: #{access_token}")
 
     access_token
+  end
+
+  def fetch_game_from_igdb(id)
+    token = fetch_access_token
+
+    uri = URI("https://api.igdb.com/v4/games")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = CLIENT_ID
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+
+    request.body = <<~BODY
+    fields name,
+    cover.image_id,
+    summary,
+    rating,
+    aggregated_rating,
+    first_release_date,
+    storyline,
+    genres.name,
+    platforms.name,
+    release_dates.human,
+    artworks.image_id,
+    screenshots.image_id,
+    videos.video_id,
+    videos.name,
+    involved_companies.company.name,
+    similar_games.name,
+    similar_games.cover.image_id,
+    similar_games.first_release_date,
+    age_ratings.rating,
+    age_ratings.category;
+      where id = #{id};
+      limit 1;
+    BODY
+
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      games = JSON.parse(response.body)
+      return games.first
+    else
+      Rails.logger.error("IGDB API error fetching game by ID: #{response.code} - #{response.body}")
+      return nil
+    end
   end
 end
