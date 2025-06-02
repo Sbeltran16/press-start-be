@@ -1,5 +1,6 @@
 class Api::GamesController < ApplicationController
   before_action :authenticate_user!, only: [:user_game_status]
+  
   require 'net/http'
   require 'json'
 
@@ -7,13 +8,15 @@ class Api::GamesController < ApplicationController
   CLIENT_SECRET = ENV['TWITCH_CLIENT_SECRET']
 
   def user_game_status
-    igdb_game_id = params[:igdb_game_id]
-    liked = current_user.game_likes.exists?(igdb_game_id: igdb_game_id)
-    played = current_user.game_plays.exists?(igdb_game_id: igdb_game_id)
-
+    if current_user
+      liked = current_user.game_likes.exists?(igdb_game_id: params[:igdb_game_id])
+      played = current_user.game_plays.exists?(igdb_game_id: params[:igdb_game_id])
+    else
+      liked = false
+      played = false
+    end
     render json: { liked: liked, played: played }
   end
-
  # Game Index
   def index
     if params[:name]
@@ -265,7 +268,6 @@ end
     fields name,
     cover.image_id,
     summary,
-    rating,
     aggregated_rating,
     first_release_date,
     storyline,

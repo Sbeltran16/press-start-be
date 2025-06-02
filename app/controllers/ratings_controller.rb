@@ -1,5 +1,5 @@
 class RatingsController < ApplicationController
-  before_action :authenticate_user!
+  skip_before_action :authenticate_user!, only: [:show]
 
   def show
     rating = Rating.find_by(user: current_user, igdb_game_id: params[:igdb_game_id])
