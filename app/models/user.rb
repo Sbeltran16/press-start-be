@@ -23,5 +23,9 @@ class User < ApplicationRecord
     #Game Plays
     has_many :game_plays, dependent: :destroy
     has_many :played_games, through: :game_plays, source: :igdb_game
+  
+  #Favorite Games Relations
+  has_many :favorite_games, -> { order(:position) }, dependent: :destroy
+
 
 end

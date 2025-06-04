@@ -39,7 +39,14 @@ Rails.application.routes.draw do
     get 'popular', to: 'games#popular'
     get 'user_game_status', to: 'games#user_game_status'
     get 'games/:id', to: 'games#show_by_id'
+
+    #Favorite Games
+    get 'favorite_games', to: 'favorite_games#index'
+    patch 'favorite_games', to: 'favorite_games#update'
   end
+
+
+
 
   # Rewiews Routes
   resources :reviews do
