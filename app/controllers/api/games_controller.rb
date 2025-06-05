@@ -122,7 +122,6 @@ class Api::GamesController < ApplicationController
     end
 
     decoded_name = CGI.unescape(name)
-    Rails.logger.info "Looking up game: #{decoded_name}"
 
     token = fetch_access_token
 
@@ -156,7 +155,8 @@ class Api::GamesController < ApplicationController
       age_ratings.rating,
       age_ratings.category;
       search "#{decoded_name}";
-      limit 1;
+      where cover != null;
+      limit 40;
     BODY
 
     response = http.request(request)
@@ -183,7 +183,7 @@ def search_by_name
     render json: { error: 'Missing name parameter' }, status: :bad_request and return
   end
 
-  decoded_name = CGI.unescape(name)
+  decoded_name = CGI.unescape(name).gsub('"', '\"').gsub('\\', '')
   Rails.logger.info "Searching for games: #{decoded_name}"
 
   token = fetch_access_token
@@ -197,9 +197,9 @@ def search_by_name
   request["Authorization"] = "Bearer #{token}"
   request["Content-Type"] = "text/plain"
   request.body = <<~BODY
-    fields name, cover.image_id, summary, rating, genres.name, first_release_date, artworks.image_id, platforms, release_dates, screenshots.image_id, storyline, videos.video_id, videos.name, involved_companies.company.name;
+    fields name, cover.image_id, summary, rating, first_release_date;
     search "#{decoded_name}";
-    limit 100;
+    limit 50;
   BODY
 
   response = http.request(request)
@@ -208,11 +208,7 @@ def search_by_name
 
   if response.code.to_i == 200
     games = JSON.parse(response.body)
-    if games.any?
-      render json: games
-    else
-      render json: { error: "No games found" }, status: :not_found
-    end
+    render json: games
   else
     render json: { error: "Failed to fetch games", status: response.code, body: response.body }, status: :bad_request
   end
