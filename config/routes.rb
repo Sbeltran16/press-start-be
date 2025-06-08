@@ -22,6 +22,9 @@ Rails.application.routes.draw do
 
   #User routes
   get "/me", to: "users#me"
+  get '/users/:username', to: 'users#show'
+
+
 
   #API Routes
   namespace :api do
