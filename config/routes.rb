@@ -43,10 +43,18 @@ Rails.application.routes.draw do
     #Favorite Games
     get 'favorite_games', to: 'favorite_games#index'
     patch 'favorite_games', to: 'favorite_games#update'
+
+    #User Review Routes
+    resources :users, only: [] do
+      get 'reviews', to: 'reviews#user_reviews', on: :member
+    end
+
+    resources :reviews, only: [:index, :create, :show, :update, :destroy] do
+      resources :review_comments, only: [:create, :destroy]
+      post 'like', to: 'review_likes#create'
+      delete 'unlike', to: 'review_likes#destroy'
+    end
   end
-
-
-
 
   # Rewiews Routes
   resources :reviews do

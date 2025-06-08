@@ -1,6 +1,5 @@
 class Api::GamesController < ApplicationController
   before_action :authenticate_user!, only: [:user_game_status]
-  
   require 'net/http'
   require 'json'
 
@@ -28,272 +27,116 @@ class Api::GamesController < ApplicationController
     render json: @games
   end
 
-
   def popular
-    # Calculate scores from your tables
-    views = GameView.group(:igdb_game_id).count
-    likes = GameLike.group(:igdb_game_id).count
-    plays = GamePlay.group(:igdb_game_id).count
-    reviews = Review.group(:igdb_game_id).count
+    top_game_ids = GameScoreService.top_game_ids(limit: 12)
+    fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
+    where_clause = "where id = (#{top_game_ids.join(',')});"
+    games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 12)
 
-    game_scores = Hash.new(0)
-
-    views.each { |game_id, count| game_scores[game_id] += count * 1 }
-    likes.each { |game_id, count| game_scores[game_id] += count * 2 }
-    plays.each { |game_id, count| game_scores[game_id] += count * 3 }
-    reviews.each { |game_id, count| game_scores[game_id] += count * 4 }
-
-    # Top game IDs sorted by score
-    top_game_ids = game_scores.sort_by { |_, score| -score }.map(&:first).take(12)
-
-    # Fetch IGDB game details for those IDs
-    token = fetch_access_token # Your method to get Twitch IGDB token
-
-    uri = URI("https://api.igdb.com/v4/games")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-
-    request = Net::HTTP::Post.new(uri.path)
-    request["Client-ID"] = CLIENT_ID
-    request["Authorization"] = "Bearer #{token}"
-    request["Content-Type"] = "text/plain"
-
-    request.body = <<~BODY
-      fields id, name, cover.image_id,  artworks.image_id, rating, summary;
-      where id = (#{top_game_ids.join(",")});
-      limit 12;
-    BODY
-
-    response = http.request(request)
-
-    if response.code.to_i == 200
-      games = JSON.parse(response.body)
-
-      # Add the score for each game from your hash
+    if games
+      scores = GameScoreService.scores_for(top_game_ids)
       games_with_scores = games.map do |game|
-        game["score"] = game_scores[game["id"]]
+        game["score"] = scores[game["id"]]
         game
       end
-
       render json: games_with_scores
     else
-      render json: { error: "Failed to fetch games", status: response.code, response_body: response.body }, status: :bad_request
+      render json: { error: "Failed to fetch games" }, status: :bad_request
     end
   end
 
-
-  # Top Games
   def top
-    token = fetch_access_token
+    top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
 
-    uri = URI("https://api.igdb.com/v4/games")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
+    fields = "name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name"
+    where_clause = "where id = (#{top_game_ids.join(',')});"
 
-    request = Net::HTTP::Post.new(uri.path)
-    request["Client-ID"] = CLIENT_ID
-    request["Authorization"] = "bearer #{token}"
-    request["Content-Type"] = "text/plain"
-    request.body = <<~BODY
-    fields name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name;
-    where id = (#{top_game_ids.join(",")});
-    limit 12;
-  BODY
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 12
+    )
 
-    response = http.request(request)
-
-    Rails.logger.debug("IGDB API Response Code: #{response.code}")
-    Rails.logger.debug("IGDB API Response Body: #{response.body}")
-
-    if response.code.to_i == 200
-      render json: JSON.parse(response.body)
+    if games
+      render json: games
     else
-      render json: { error: "Failed to fetch games", status: response.code, response_body: response.body }, status: :bad_request
+      render json: { error: "Failed to fetch games" }, status: :bad_request
     end
   end
 
-
-  # Show games by name
   def show_by_name
     name = params[:name]
-
-    if name.blank?
-      render json: { error: 'Missing name parameter' }, status: :bad_request and return
-    end
+    return render json: { error: 'Missing name parameter' }, status: :bad_request if name.blank?
 
     decoded_name = CGI.unescape(name)
 
-    token = fetch_access_token
+    fields = %w[
+      name cover.image_id summary rating aggregated_rating first_release_date
+      storyline genres.name platforms.name release_dates.human artworks.image_id
+      screenshots.image_id videos.video_id videos.name involved_companies.company.name
+      similar_games.name similar_games.cover.image_id similar_games.first_release_date
+      age_ratings.rating age_ratings.category
+    ].join(", ")
 
-    uri = URI("https://api.igdb.com/v4/games")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
+    games = IgdbService.fetch_games(
+      query: "search \"#{decoded_name}\";",
+      fields: fields,
+      where_clause: "where cover != null;",
+      limit: 40
+    )
 
-    request = Net::HTTP::Post.new(uri.path)
-    request["Client-ID"] = CLIENT_ID
-    request["Authorization"] = "Bearer #{token}"
-    request["Content-Type"] = "text/plain"
-    request.body = <<~BODY
-      fields name,
-      cover.image_id,
-      summary,
-      rating,
-      aggregated_rating,
-      first_release_date,
-      storyline,
-      genres.name,
-      platforms.name,
-      release_dates.human,
-      artworks.image_id,
-      screenshots.image_id,
-      videos.video_id,
-      videos.name,
-      involved_companies.company.name,
-      similar_games.name,
-      similar_games.cover.image_id,
-      similar_games.first_release_date,
-      age_ratings.rating,
-      age_ratings.category;
-      search "#{decoded_name}";
-      where cover != null;
-      limit 40;
-    BODY
-
-    response = http.request(request)
-
-    Rails.logger.debug("IGDB Search Response: #{response.body}")
-
-    if response.code.to_i == 200
-      games = JSON.parse(response.body)
-      if games.any?
-        render json: games.first
-      else
-        render json: { error: "Game not found" }, status: :not_found
-      end
+    if games&.any?
+      render json: games.first
     else
-      render json: { error: "Failed to fetch game", status: response.code, body: response.body }, status: :bad_request
+      render json: { error: "Game not found" }, status: :not_found
     end
   end
 
-  # Show multiple games by name (for search results page)
-def search_by_name
-  name = params[:name]
+  def search_by_name
+    name = params[:name]
+    return render json: { error: 'Missing name parameter' }, status: :bad_request if name.blank?
 
-  if name.blank?
-    render json: { error: 'Missing name parameter' }, status: :bad_request and return
-  end
+    decoded_name = CGI.unescape(name).gsub('"', '\"').gsub('\\', '')
 
-  decoded_name = CGI.unescape(name).gsub('"', '\"').gsub('\\', '')
-  Rails.logger.info "Searching for games: #{decoded_name}"
+    games = IgdbService.fetch_games(
+      query: "search \"#{decoded_name}\";",
+      fields: "name, cover.image_id, summary, rating, first_release_date",
+      where_clause: "",
+      limit: 50
+    )
 
-  token = fetch_access_token
-
-  uri = URI("https://api.igdb.com/v4/games")
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.use_ssl = true
-
-  request = Net::HTTP::Post.new(uri.path)
-  request["Client-ID"] = CLIENT_ID
-  request["Authorization"] = "Bearer #{token}"
-  request["Content-Type"] = "text/plain"
-  request.body = <<~BODY
-    fields name, cover.image_id, summary, rating, first_release_date;
-    search "#{decoded_name}";
-    limit 50;
-  BODY
-
-  response = http.request(request)
-
-  Rails.logger.debug("IGDB Search Response: #{response.body}")
-
-  if response.code.to_i == 200
-    games = JSON.parse(response.body)
-    render json: games
-  else
-    render json: { error: "Failed to fetch games", status: response.code, body: response.body }, status: :bad_request
-  end
-end
-
-def show_by_id
-  igdb_game_id = params[:id]
-
-  game = fetch_game_from_igdb(igdb_game_id)
-
-  if game
-    render json: game
-  else
-    render json: { error: "Game not found" }, status: :not_found
-  end
-end
-
-  private
-  def fetch_access_token
-    uri = URI("https://id.twitch.tv/oauth2/token")
-
-    response = Net::HTTP.post_form(uri, {
-      client_id: ENV["TWITCH_CLIENT_ID"],
-      client_secret: ENV["TWITCH_CLIENT_SECRET"],
-      grant_type: "client_credentials"
-    })
-
-    Rails.logger.debug("Twitch Token Response: #{response.body}")
-
-    response_data = JSON.parse(response.body)
-
-    Rails.logger.debug("Twitch Token Parsed Response: #{response_data}")
-
-    access_token = response_data["access_token"]
-    Rails.logger.debug("Twitch Token: #{access_token}")
-
-    access_token
-  end
-
-  def fetch_game_from_igdb(id)
-    token = fetch_access_token
-
-    uri = URI("https://api.igdb.com/v4/games")
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-
-    request = Net::HTTP::Post.new(uri.path)
-    request["Client-ID"] = CLIENT_ID
-    request["Authorization"] = "Bearer #{token}"
-    request["Content-Type"] = "text/plain"
-
-    request.body = <<~BODY
-    fields name,
-    cover.image_id,
-    summary,
-    aggregated_rating,
-    first_release_date,
-    storyline,
-    genres.name,
-    game_engines.name,
-    platforms.name,
-    release_dates.human,
-    artworks.image_id,
-    screenshots.image_id,
-    language_supports.language.name,
-    videos.video_id,
-    videos.name,
-    involved_companies.company.name,
-    similar_games.name,
-    similar_games.cover.image_id,
-    similar_games.first_release_date,
-    age_ratings.rating,
-    age_ratings.category;
-      where id = #{id};
-      limit 1;
-    BODY
-
-    response = http.request(request)
-
-    if response.code.to_i == 200
-      games = JSON.parse(response.body)
-      return games.first
+    if games
+      render json: games
     else
-      Rails.logger.error("IGDB API error fetching game by ID: #{response.code} - #{response.body}")
-      return nil
+      render json: { error: "Failed to fetch games" }, status: :bad_request
+    end
+  end
+
+
+  def show_by_id
+    igdb_game_id = params[:id]
+
+    fields = %w[
+      name cover.image_id summary aggregated_rating first_release_date
+      storyline genres.name game_engines.name platforms.name release_dates.human
+      artworks.image_id screenshots.image_id language_supports.language.name
+      videos.video_id videos.name involved_companies.company.name
+      similar_games.name similar_games.cover.image_id similar_games.first_release_date
+      age_ratings.rating age_ratings.category
+    ].join(", ")
+
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: "where id = #{igdb_game_id};",
+      limit: 1
+    )
+
+    if games&.first
+      render json: games.first
+    else
+      render json: { error: "Game not found" }, status: :not_found
     end
   end
 end
