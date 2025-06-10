@@ -1,6 +1,6 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!
+    before_action :authenticate_user!, only: [:create]
 
     def user_reviews
       user = User.find(params[:id])
