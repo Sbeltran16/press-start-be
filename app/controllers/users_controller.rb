@@ -13,7 +13,7 @@ class UsersController < ApplicationController
   end
 
   def show
-    user = User.find_by(username: params[:username])
+    user = User.where("LOWER(username) = ?", params[:username].to_s.downcase).first
 
     if user
       render json: {
@@ -21,9 +21,10 @@ class UsersController < ApplicationController
         data: UserSerializer.new(user).serializable_hash[:data][:attributes]
       }
     else
-      render json: {status: 404, error: "User not found"}
+      render json: { status: 404, error: "User not found" }
     end
   end
+
 
   private
 

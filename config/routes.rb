@@ -20,12 +20,6 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   # root "posts#index"
 
-  #User routes
-  get "/me", to: "users#me"
-  get '/users/:username', to: 'users#show'
-
-
-
   #API Routes
   namespace :api do
     #Game Interaction Routes
@@ -59,15 +53,23 @@ Rails.application.routes.draw do
     end
   end
 
-  # Rewiews Routes
-  resources :reviews do
-  resources :review_comments, only: [:create, :destroy]
-  post 'like', to: 'review_likes#create'
-  delete 'unlike', to: 'review_likes#destroy'
-  end
+  #Follows Routes
+  resources :follows, only: [:create, :destroy]
+  get "follows/:id/status", to: "follows#status"
 
   # Ratings Routes
   post '/ratings', to: 'ratings#create'
   get '/ratings/:igdb_game_id', to: 'ratings#show'
+
+  # Rewiews Routes
+  resources :reviews do
+    resources :review_comments, only: [:create, :destroy]
+    post 'like', to: 'review_likes#create'
+    delete 'unlike', to: 'review_likes#destroy'
+  end
+
+  #User routes
+  get "/me", to: "users#me"
+  get '/users/:username', to: 'users#show'
 
 end
