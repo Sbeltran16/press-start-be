@@ -3,8 +3,12 @@ class FollowsController < ApplicationController
 
   def create
     user = User.find(params[:followed_id])
-    current_user.following << user unless current_user.following.include?(user)
-    render json: { status: 200, message: "Followed #{user.username}" }
+    follow = current_user.active_follows.build(followed: user)
+    if follow.save
+      render json: { status: 200, message: "Followed #{user.username}" }
+    else
+      render json: { status: 422, errors: follow.errors.full_messages }, status: :unprocessable_entity
+    end
   end
 
   def destroy
@@ -17,5 +21,17 @@ class FollowsController < ApplicationController
     followed = User.find(params[:id])
     is_following = current_user.following.exists?(followed.id)
     render json: { is_following: is_following }
+  end
+
+  def followers
+    user = User.find(params[:id])
+    followers = user.followers.where.not(id: user.id)
+    render json: { data: followers }
+  end
+
+  def following
+    user = User.find(params[:id])
+    following = user.following.where.not(id: user.id)
+    render json: { data: following }
   end
 end

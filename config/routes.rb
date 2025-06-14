@@ -53,6 +53,13 @@ Rails.application.routes.draw do
     end
   end
 
+  resources :users, only: [] do
+    member do
+      get 'followers', to: 'follows#followers'
+      get 'following', to: 'follows#following'
+    end
+  end
+
   #Follows Routes
   resources :follows, only: [:create, :destroy]
   get "follows/:id/status", to: "follows#status"
