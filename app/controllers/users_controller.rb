@@ -1,5 +1,5 @@
 class UsersController < ApplicationController
-  before_action :authenticate_user!, only: [:me, :update]
+  before_action :authenticate_user!, only: [:me, :update_picture]
 
   def me
     if current_user
