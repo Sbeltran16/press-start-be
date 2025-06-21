@@ -57,7 +57,9 @@ Rails.application.configure do
   config.active_job.verbose_enqueue_logs = true
 
   # confing mailer
-  config.action_mailer.default_url_options = { host: 'localhost', port: 4000 }
+  config.action_mailer.default_url_options = { host: 'localhost', port: 3001 }
+
+  Rails.application.routes.default_url_options[:host] = ENV['PRESS_START_HOST'] || 'localhost:3001'
 
 
   # Raises error for missing translations.

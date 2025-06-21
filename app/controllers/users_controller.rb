@@ -1,5 +1,5 @@
 class UsersController < ApplicationController
-  before_action :authenticate_user!, only: [:me]
+  before_action :authenticate_user!, only: [:me, :update]
 
   def me
     if current_user
@@ -25,6 +25,13 @@ class UsersController < ApplicationController
     end
   end
 
+  def update
+    if current_user.update(user_params)
+      render json: { status: 200, data: UserSerializer.new(current_user).serializable_hash[:data][:attributes] }
+    else
+      render json: { status: 422, errors: current_user.errors.full_messages }
+    end
+  end
 
   private
 

@@ -14,6 +14,10 @@ gem "puma", ">= 5.0"
 #for env files
 gem 'dotenv-rails'
 
+#Amazon S3
+gem "aws-sdk-s3", require: false
+
+
 
 gem 'sprockets-rails'
 

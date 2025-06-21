@@ -4,6 +4,7 @@ class User < ApplicationRecord
   devise :database_authenticatable, :registerable, :validatable,
          :jwt_authenticatable, jwt_revocation_strategy: self
 
+  has_one_attached :profile_picture
   validates :username, presence: true, uniqueness: { case_sensitive: false }
   validates :bio, length: { maximum: 500 }
 
