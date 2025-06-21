@@ -57,6 +57,8 @@ Rails.application.configure do
   # want to log everything, set the level to "debug".
   config.log_level = ENV.fetch("RAILS_LOG_LEVEL", "info")
 
+  Rails.application.routes.default_url_options[:host] = ENV['PRESS_START_HOST'] || 'https://press-start-be.onrender.com'
+
   # Use a different cache store in production.
   # config.cache_store = :mem_cache_store
 
