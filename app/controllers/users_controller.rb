@@ -26,7 +26,8 @@ class UsersController < ApplicationController
   end
 
   def update
-    if current_user.update(user_params)
+    safe_params = user_params.compact_blank
+    if current_user.update(safe_params)
       render json: { status: 200, data: UserSerializer.new(current_user).serializable_hash[:data][:attributes] }
     else
       render json: { status: 422, errors: current_user.errors.full_messages }
