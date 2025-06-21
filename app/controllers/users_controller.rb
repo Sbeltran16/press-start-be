@@ -26,6 +26,7 @@ class UsersController < ApplicationController
   end
 
   def update_picture
+    Rails.logger.info "Params: #{params.inspect}"
     if current_user.update(params.require(:user).permit(:profile_picture))
       render json: { status: 200, data: UserSerializer.new(current_user).serializable_hash[:data][:attributes] }
     else
