@@ -78,6 +78,6 @@ Rails.application.routes.draw do
   #User routes
   get "/me", to: "users#me"
   get '/users/:username', to: 'users#show'
-  patch '/users/update', to: 'users#update'
+  patch "/users/update_picture", to: "users#update_picture"
 
 end
