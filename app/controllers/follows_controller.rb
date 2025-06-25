@@ -26,12 +26,18 @@ class FollowsController < ApplicationController
   def followers
     user = User.find(params[:id])
     followers = user.followers.where.not(id: user.id)
-    render json: { data: followers }
+
+    render json: {
+      data: followers.map { |follower| UserSerializer.new(follower).serializable_hash[:data][:attributes] }
+    }
   end
 
   def following
     user = User.find(params[:id])
     following = user.following.where.not(id: user.id)
-    render json: { data: following }
+
+    render json: {
+      data: following.map { |followed| UserSerializer.new(followed).serializable_hash[:data][:attributes] }
+    }
   end
 end
