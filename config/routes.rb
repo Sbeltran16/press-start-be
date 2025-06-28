@@ -20,6 +20,10 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   # root "posts#index"
 
+  #Activities Routes
+  get "/api/activity_feed", to: "activities#feed"
+
+
   #API Routes
   namespace :api do
     #Game Interaction Routes
