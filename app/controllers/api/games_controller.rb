@@ -132,9 +132,11 @@ class Api::GamesController < ApplicationController
       where_clause: "where id = #{igdb_game_id};",
       limit: 1
     )
-
     if games&.first
-      render json: games.first
+      game = games.first
+      steam_url = IgdbService.fetch_steam_url(igdb_game_id)
+      game["steam_url"] = steam_url if steam_url
+      render json: game
     else
       render json: { error: "Game not found" }, status: :not_found
     end

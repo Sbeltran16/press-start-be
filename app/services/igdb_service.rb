@@ -35,4 +35,66 @@ class IgdbService
     })
     JSON.parse(response.body)["access_token"]
   end
+
+  def self.fetch_steam_url(igdb_game_id)
+    token = fetch_access_token
+    uri = URI("https://api.igdb.com/v4/external_games")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = ENV['TWITCH_CLIENT_ID']
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+
+    body = <<~BODY
+      fields uid;
+      where game = #{igdb_game_id} & external_game_source = 1;
+      limit 1;
+    BODY
+
+    request.body = body.strip
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      json = JSON.parse(response.body)
+      uid = json.first&.dig("uid")
+      return "https://store.steampowered.com/app/#{uid}/" if uid
+    end
+
+    nil
+  rescue => e
+    Rails.logger.error("IGDB Steam URL Error: #{e.message}")
+    nil
+  end
+
+  def self.fetch_external_links(igdb_game_id)
+    token = fetch_access_token
+    uri = URI("https://api.igdb.com/v4/external_games")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+  
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = ENV['TWITCH_CLIENT_ID']
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+  
+    body = <<~BODY
+      fields uid, url, external_game_source;
+      where game = #{igdb_game_id} & external_game_source != null;
+      limit 50;
+    BODY
+  
+    request.body = body.strip
+    response = http.request(request)
+  
+    return JSON.parse(response.body) if response.code.to_i == 200
+  
+    []
+  rescue => e
+    Rails.logger.error("IGDB External Links Error: #{e.message}")
+    []
+  end
+  
+
 end
