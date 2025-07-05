@@ -22,6 +22,7 @@ class ActivitiesController < ApplicationController
         rating: review.rating,
         content: review.comment,
         username: review.user.username,
+        user_picture_url: review.user.profile_picture_url,
         timestamp: review.created_at
       }
     end

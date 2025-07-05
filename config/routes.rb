@@ -33,6 +33,9 @@ Rails.application.routes.draw do
     post 'game_plays', to: 'game_plays#create'
     delete 'game_plays', to: 'game_plays#destroy_by_igdb'
 
+    #Platform Logos
+    get "platform_logos", to: "platform_logos#index"
+
     #Game Routes
     get 'top_games', to: 'games#top'
     get 'games', to: 'games#show_by_name'

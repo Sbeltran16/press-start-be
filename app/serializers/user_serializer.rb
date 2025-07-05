@@ -4,7 +4,10 @@ class UserSerializer
 
   attribute :profile_picture_url do |user|
     if user.profile_picture.attached?
-      Rails.application.routes.url_helpers.rails_blob_url(user.profile_picture, only_path: false)
+      Rails.application.routes.url_helpers.rails_representation_url(
+        user.profile_picture.variant(resize_to_limit: [200, 200]).processed,
+        only_path: false
+      )
     else
       nil
     end

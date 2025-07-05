@@ -35,5 +35,14 @@ class User < ApplicationRecord
   has_many :following, through: :active_follows, source: :followed
   has_many :followers, through: :passive_follows, source: :follower
 
-
+  def profile_picture_url
+    if profile_picture.attached?
+      Rails.application.routes.url_helpers.rails_representation_url(
+        profile_picture.variant(resize_to_limit: [200, 200]).processed,
+        only_path: false
+      )
+    else
+      nil
+    end
+  end
 end

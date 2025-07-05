@@ -1,10 +1,12 @@
 module Api
   class ExternalGamesController < ApplicationController
+  skip_before_action :authenticate_user!
+
     def show
       igdb_game_id = params[:id]
       external_links = IgdbService.fetch_external_links(igdb_game_id)
 
-      allowed_sources = [1, 31, 36]
+      allowed_sources = [1, 31, 36, 11]
 
       formatted = external_links.map do |entry|
         next unless allowed_sources.include?(entry["external_game_source"])
@@ -29,13 +31,12 @@ module Api
       {
         1 => "steam",
         31 => "xbox",
-        36 => "playstation"
+        36 => "playstation",
       }[source] || "other"
     end
 
     def build_platform_url(source, uid)
       return nil unless uid
-
       case source
       when 1
         "https://store.steampowered.com/app/#{uid}/"
