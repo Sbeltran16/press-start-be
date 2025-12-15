@@ -31,7 +31,7 @@ class Api::GamesController < ApplicationController
     top_game_ids = GameScoreService.top_game_ids(limit: 12)
     fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
     where_clause = "where id = (#{top_game_ids.join(',')});"
-    games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 12)
+    games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 6)
 
     if games
       scores = GameScoreService.scores_for(top_game_ids)
