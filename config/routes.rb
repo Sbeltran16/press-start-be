@@ -76,13 +76,6 @@ Rails.application.routes.draw do
   post '/ratings', to: 'ratings#create'
   get '/ratings/:igdb_game_id', to: 'ratings#show'
 
-  # Rewiews Routes
-  resources :reviews do
-    resources :review_comments, only: [:create, :destroy]
-    post 'like', to: 'review_likes#create'
-    delete 'unlike', to: 'review_likes#destroy'
-  end
-
   #User routes
   get "/me", to: "users#me"
   get '/users/:username', to: 'users#show'
