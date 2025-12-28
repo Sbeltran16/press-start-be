@@ -55,7 +55,7 @@ Rails.application.routes.draw do
     end
 
     resources :reviews, only: [:index, :create, :show, :update, :destroy] do
-      resources :review_comments, only: [:create, :destroy]
+      resources :review_comments, only: [:index, :create, :destroy], path: 'comments'
       post 'like', to: 'review_likes#create'
       delete 'unlike', to: 'review_likes#destroy'
     end

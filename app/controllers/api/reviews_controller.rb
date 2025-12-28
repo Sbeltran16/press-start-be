@@ -1,6 +1,8 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!, only: [:create]
+    before_action :authenticate_user!, only: [:create, :update, :destroy]
+    before_action :set_review, only: [:show, :update, :destroy]
+    before_action :authorize_review_owner, only: [:update, :destroy]
 
     # GET /api/users/:id/reviews
     def user_reviews
@@ -25,6 +27,11 @@ module Api
       }, status: :ok
     end
 
+    # GET /api/reviews/:id
+    def show
+      render json: serialize_review(@review), status: :ok
+    end
+
     # POST /api/reviews
     def create
       review = current_user.reviews.build(review_params)
@@ -35,7 +42,32 @@ module Api
       end
     end
 
+    # PATCH/PUT /api/reviews/:id
+    def update
+      if @review.update(review_params)
+        render json: serialize_review(@review), status: :ok
+      else
+        render json: { errors: @review.errors.full_messages }, status: :unprocessable_entity
+      end
+    end
+
+    # DELETE /api/reviews/:id
+    def destroy
+      @review.destroy
+      render json: { message: 'Review deleted' }, status: :ok
+    end
+
     private
+
+    def set_review
+      @review = Review.find(params[:id])
+    end
+
+    def authorize_review_owner
+      unless @review.user_id == current_user.id
+        render json: { errors: ['Not authorized'] }, status: :forbidden
+      end
+    end
 
     def review_params
       params.require(:review).permit(:comment, :rating, :igdb_game_id)

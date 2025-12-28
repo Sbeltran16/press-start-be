@@ -29,24 +29,43 @@ class Api::GamesController < ApplicationController
 
   def popular
     top_game_ids = GameScoreService.top_game_ids(limit: 12)
+    
+    # If no games have interactions yet, fallback to top liked games
+    if top_game_ids.empty?
+      top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
+    end
+    
+    # If still empty, return empty array instead of making invalid API call
+    if top_game_ids.empty?
+      render json: []
+      return
+    end
+    
     fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
     where_clause = "where id = (#{top_game_ids.join(',')});"
     games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 6)
 
-    if games
+    if games && games.any?
       scores = GameScoreService.scores_for(top_game_ids)
       games_with_scores = games.map do |game|
-        game["score"] = scores[game["id"]]
+        game["score"] = scores[game["id"]] || 0
         game
       end
       render json: games_with_scores
     else
-      render json: { error: "Failed to fetch games" }, status: :bad_request
+      # Fallback: return empty array instead of error
+      render json: []
     end
   end
 
   def top
     top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
+
+    # If no games have likes yet, return empty array
+    if top_game_ids.empty?
+      render json: []
+      return
+    end
 
     fields = "name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name"
     where_clause = "where id = (#{top_game_ids.join(',')});"
@@ -58,10 +77,11 @@ class Api::GamesController < ApplicationController
       limit: 12
     )
 
-    if games
+    if games && games.any?
       render json: games
     else
-      render json: { error: "Failed to fetch games" }, status: :bad_request
+      # Return empty array instead of error
+      render json: []
     end
   end
 
