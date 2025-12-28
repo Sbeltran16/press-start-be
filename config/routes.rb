@@ -49,6 +49,11 @@ Rails.application.routes.draw do
     get 'favorite_games', to: 'favorite_games#index'
     patch 'favorite_games', to: 'favorite_games#update'
 
+    #Backlog Games
+    get 'backlog_games', to: 'backlog_games#index'
+    post 'backlog_games', to: 'backlog_games#create'
+    delete 'backlog_games/:id', to: 'backlog_games#destroy'
+
     #User Review Routes
     resources :users, only: [] do
       get 'reviews', to: 'reviews#user_reviews', on: :member

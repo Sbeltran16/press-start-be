@@ -42,6 +42,15 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "backlog_games", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "igdb_game_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "igdb_game_id"], name: "index_backlog_games_on_user_id_and_igdb_game_id", unique: true
+    t.index ["user_id"], name: "index_backlog_games_on_user_id"
+  end
+
   create_table "favorite_games", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "igdb_game_id"
@@ -146,6 +155,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "backlog_games", "users"
   add_foreign_key "favorite_games", "users"
   add_foreign_key "follows", "users", column: "followed_id"
   add_foreign_key "follows", "users", column: "follower_id"
