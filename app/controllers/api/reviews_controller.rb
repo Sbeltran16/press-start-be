@@ -8,7 +8,7 @@ module Api
     def user_reviews
       user = User.find(params[:id])
       reviews = user.reviews
-                    .includes(:review_likes)
+                    .includes(:review_likes, :review_comments, :user)
                     .order(created_at: :desc) # Sort newest first
 
       render json: reviews.map { |review|
@@ -19,7 +19,7 @@ module Api
     # GET /api/reviews
     def index
       reviews = Review.all
-                      .includes(:review_likes)
+                      .includes(:review_likes, :review_comments, :user)
                       .order(created_at: :desc)
 
       render json: reviews.map { |review|
@@ -80,11 +80,17 @@ module Api
         comment: review.comment,
         rating: review.rating,
         igdb_game_id: review.igdb_game_id,
-        likes_count: review.review_likes.count,
+        likes_count: review.review_likes.size, # Use size to use loaded association if available
         liked_by_current_user: current_user ? review.review_likes.exists?(user_id: current_user.id) : false,
+        comments_count: review.review_comments.size, # Use size to use loaded association if available
         created_at: review.created_at,
         updated_at: review.updated_at,
-        user_id: review.user_id
+        user_id: review.user_id,
+        user: review.user ? {
+          id: review.user.id,
+          username: review.user.username,
+          profile_picture_url: review.user.profile_picture_url
+        } : nil
       }
     end
   end

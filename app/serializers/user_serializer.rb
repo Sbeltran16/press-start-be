@@ -21,4 +21,12 @@ class UserSerializer
   attribute :following_count do |user|
     user.following.count
   end
+
+  attribute :reviews_count do |user|
+    user.reviews.count
+  end
+
+  attribute :games_count do |user|
+    user.reviews.select(:igdb_game_id).distinct.count
+  end
 end
