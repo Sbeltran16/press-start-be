@@ -27,6 +27,6 @@ class UserSerializer
   end
 
   attribute :games_count do |user|
-    user.reviews.select(:igdb_game_id).distinct.count
+    user.reviews.distinct.count(:igdb_game_id)
   end
 end

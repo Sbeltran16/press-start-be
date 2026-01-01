@@ -18,7 +18,6 @@ class ActivitiesController < ApplicationController
       {
         type: "review",
         message: "#{review.user.username} reviewed a game",
-        review_id: review.id,
         igdb_game_id: review.igdb_game_id,
         rating: review.rating,
         content: review.comment,

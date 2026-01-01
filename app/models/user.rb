@@ -29,10 +29,7 @@ class User < ApplicationRecord
   has_many :favorite_games, -> { order(:position) }, dependent: :destroy
 
   #Backlog Games Relations
-  # Only define if table exists (migration may not have run yet)
-  if ActiveRecord::Base.connection.table_exists?('backlog_games')
-    has_many :backlog_games, dependent: :destroy
-  end
+  has_many :backlog_games, dependent: :destroy
 
   # Follow system
   has_many :active_follows, class_name: "Follow", foreign_key: "follower_id", dependent: :destroy

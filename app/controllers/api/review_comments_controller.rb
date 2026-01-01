@@ -14,7 +14,7 @@ module Api
       }, status: :ok
     end
 
-    # POST /api/reviews/:review_id/review_comments
+    # POST /api/reviews/:review_id/comments
     def create
       review = Review.find(params[:review_id])
       comment = review.review_comments.build(comment_params)
@@ -27,23 +27,24 @@ module Api
       end
     end
 
-    # DELETE /api/reviews/:review_id/review_comments/:id
+    # DELETE /api/reviews/:review_id/comments/:id
     def destroy
-      comment = ReviewComment.find(params[:id])
+      review = Review.find(params[:review_id])
+      comment = review.review_comments.find(params[:id])
 
       # Only allow the comment owner to delete
       if comment.user_id == current_user.id
         comment.destroy
-        render json: { message: 'Comment deleted' }, status: :ok
+        render json: { message: "Comment deleted" }, status: :ok
       else
-        render json: { errors: ['Not authorized'] }, status: :forbidden
+        render json: { errors: ["Not authorized"] }, status: :forbidden
       end
     end
 
     private
 
     def comment_params
-      params.require(:review_comment).permit(:content)
+      params.permit(:content)
     end
 
     def serialize_comment(comment)
@@ -60,5 +61,4 @@ module Api
     end
   end
 end
-
 

@@ -42,6 +42,7 @@ Rails.application.routes.draw do
     get 'games/search', to: 'games#search_by_name'
     get 'popular', to: 'games#popular'
     get 'user_game_status', to: 'games#user_game_status'
+    get 'games/batch', to: 'games#batch'
     get 'games/:id', to: 'games#show_by_id'
     get 'igdb/external_games/:id', to: 'external_games#show'
 
@@ -52,7 +53,7 @@ Rails.application.routes.draw do
     #Backlog Games
     get 'backlog_games', to: 'backlog_games#index'
     post 'backlog_games', to: 'backlog_games#create'
-    delete 'backlog_games/:id', to: 'backlog_games#destroy'
+    delete 'backlog_games', to: 'backlog_games#destroy'
 
     #User Review Routes
     resources :users, only: [] do
@@ -60,6 +61,9 @@ Rails.application.routes.draw do
     end
 
     resources :reviews, only: [:index, :create, :show, :update, :destroy] do
+      collection do
+        get 'popular', to: 'reviews#popular'
+      end
       resources :review_comments, only: [:index, :create, :destroy], path: 'comments'
       post 'like', to: 'review_likes#create'
       delete 'unlike', to: 'review_likes#destroy'

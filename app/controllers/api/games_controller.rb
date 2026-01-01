@@ -29,43 +29,24 @@ class Api::GamesController < ApplicationController
 
   def popular
     top_game_ids = GameScoreService.top_game_ids(limit: 12)
-    
-    # If no games have interactions yet, fallback to top liked games
-    if top_game_ids.empty?
-      top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
-    end
-    
-    # If still empty, return empty array instead of making invalid API call
-    if top_game_ids.empty?
-      render json: []
-      return
-    end
-    
     fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
     where_clause = "where id = (#{top_game_ids.join(',')});"
     games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 6)
 
-    if games && games.any?
+    if games
       scores = GameScoreService.scores_for(top_game_ids)
       games_with_scores = games.map do |game|
-        game["score"] = scores[game["id"]] || 0
+        game["score"] = scores[game["id"]]
         game
       end
       render json: games_with_scores
     else
-      # Fallback: return empty array instead of error
-      render json: []
+      render json: { error: "Failed to fetch games" }, status: :bad_request
     end
   end
 
   def top
     top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
-
-    # If no games have likes yet, return empty array
-    if top_game_ids.empty?
-      render json: []
-      return
-    end
 
     fields = "name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name"
     where_clause = "where id = (#{top_game_ids.join(',')});"
@@ -77,11 +58,10 @@ class Api::GamesController < ApplicationController
       limit: 12
     )
 
-    if games && games.any?
+    if games
       render json: games
     else
-      # Return empty array instead of error
-      render json: []
+      render json: { error: "Failed to fetch games" }, status: :bad_request
     end
   end
 
@@ -133,6 +113,48 @@ class Api::GamesController < ApplicationController
     end
   end
 
+
+  def batch
+    game_ids = params[:ids]
+    return render json: { error: 'Missing ids parameter' }, status: :bad_request if game_ids.blank?
+
+    # Parse comma-separated IDs or array
+    ids = if game_ids.is_a?(Array)
+            game_ids.map(&:to_i)
+          else
+            game_ids.to_s.split(',').map(&:to_i).reject(&:zero?)
+          end
+
+    return render json: [], status: :ok if ids.empty?
+
+    # Limit to prevent abuse
+    ids = ids.take(50)
+
+    fields = %w[
+      id name cover.image_id summary aggregated_rating first_release_date
+      storyline genres.name game_engines.name platforms.name release_dates.human
+      artworks.image_id screenshots.image_id language_supports.language.name
+      videos.video_id videos.name involved_companies.company.name
+      similar_games.name similar_games.cover.image_id similar_games.first_release_date
+      age_ratings.rating age_ratings.category
+    ].join(", ")
+
+    where_clause = "where id = (#{ids.join(',')});"
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: ids.length
+    )
+
+    if games
+      # Return as hash keyed by ID for easy lookup
+      games_hash = games.index_by { |game| game["id"] }
+      render json: games_hash
+    else
+      render json: {}, status: :ok
+    end
+  end
 
   def show_by_id
     igdb_game_id = params[:id]
