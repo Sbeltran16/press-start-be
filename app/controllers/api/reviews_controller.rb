@@ -1,6 +1,6 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!, only: [:create, :update]
+    before_action :authenticate_user!, only: [:create, :update, :destroy]
 
     # GET /api/users/:id/reviews
     def user_reviews
@@ -92,6 +92,20 @@ module Api
       else
         render json: { errors: review.errors.full_messages }, status: :unprocessable_entity
       end
+    end
+
+    # DELETE /api/reviews/:id
+    def destroy
+      review = Review.find(params[:id])
+      
+      # Only allow the review owner to delete
+      if review.user_id != current_user.id
+        render json: { errors: ["Not authorized"] }, status: :forbidden
+        return
+      end
+
+      review.destroy
+      render json: { message: "Review deleted" }, status: :ok
     end
 
     private
