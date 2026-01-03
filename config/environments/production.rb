@@ -70,15 +70,32 @@ Rails.application.configure do
 
   # Mailer configuration for production
   config.action_mailer.delivery_method = :smtp
-  config.action_mailer.smtp_settings = {
+  
+  # Build SMTP settings dynamically
+  smtp_config = {
     address: ENV['SMTP_ADDRESS'] || 'smtp.gmail.com',
-    port: ENV['SMTP_PORT'] || 587,
-    domain: ENV['SMTP_DOMAIN'],
-    user_name: ENV['SMTP_USERNAME'],
-    password: ENV['SMTP_PASSWORD'],
+    port: (ENV['SMTP_PORT'] || 587).to_i,
     authentication: 'plain',
     enable_starttls_auto: true
   }
+  
+  # Add credentials only if present
+  smtp_config[:user_name] = ENV['SMTP_USERNAME'] if ENV['SMTP_USERNAME'].present?
+  smtp_config[:password] = ENV['SMTP_PASSWORD'] if ENV['SMTP_PASSWORD'].present?
+  
+  # Set domain
+  if ENV['SMTP_DOMAIN'].present?
+    smtp_config[:domain] = ENV['SMTP_DOMAIN']
+  elsif ENV['SMTP_ADDRESS'].present? && ENV['SMTP_ADDRESS'].include?('@')
+    smtp_config[:domain] = ENV['SMTP_ADDRESS'].split('@').last
+  else
+    smtp_config[:domain] = 'gmail.com' # Default fallback
+  end
+  
+  config.action_mailer.smtp_settings = smtp_config
+  
+  # Log SMTP configuration status on startup (without exposing passwords)
+  Rails.logger.info "SMTP Config Status: address=#{ENV['SMTP_ADDRESS'].present? ? 'SET' : 'NOT SET'}, username=#{ENV['SMTP_USERNAME'].present? ? 'SET' : 'NOT SET'}, password=#{ENV['SMTP_PASSWORD'].present? ? 'SET' : 'NOT SET'}, domain=#{smtp_config[:domain]}"
   # Set default FRONTEND_URL for production if not set
   ENV['FRONTEND_URL'] ||= 'https://pressstart.gg'
   config.action_mailer.default_url_options = { host: 'pressstart.gg', protocol: 'https' }
