@@ -8,8 +8,12 @@ class Users::RegistrationsController < Devise::RegistrationsController
   def respond_with(resource, _opts = {})
     if request.method == "POST" && resource.persisted?
       # Send confirmation email with error handling
-      # Only send if SMTP is configured
-      if ENV['SMTP_USERNAME'].present? && ENV['SMTP_PASSWORD'].present?
+      # Only send if SMTP is fully configured
+      smtp_configured = ENV['SMTP_USERNAME'].present? && 
+                       ENV['SMTP_PASSWORD'].present? && 
+                       ENV['SMTP_ADDRESS'].present?
+      
+      if smtp_configured
         begin
           unless resource.confirmed?
             # Generate token and send email
@@ -28,7 +32,11 @@ class Users::RegistrationsController < Devise::RegistrationsController
           end
         end
       else
-        Rails.logger.warn "SMTP not configured - auto-confirming user #{resource.id}"
+        missing = []
+        missing << "SMTP_USERNAME" unless ENV['SMTP_USERNAME'].present?
+        missing << "SMTP_PASSWORD" unless ENV['SMTP_PASSWORD'].present?
+        missing << "SMTP_ADDRESS" unless ENV['SMTP_ADDRESS'].present?
+        Rails.logger.warn "SMTP not fully configured (missing: #{missing.join(', ')}) - auto-confirming user #{resource.id}"
         # Auto-confirm user if SMTP is not configured
         begin
           resource.confirm unless resource.confirmed?
