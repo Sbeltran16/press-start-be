@@ -17,7 +17,12 @@ class Users::RegistrationsController < Devise::RegistrationsController
         begin
           unless resource.confirmed?
             # Generate token and send email
-            resource.send_confirmation_instructions
+            email_sent = resource.send_confirmation_instructions
+            # If email sending failed, auto-confirm user
+            unless email_sent
+              Rails.logger.warn "Email sending failed - auto-confirming user #{resource.id}"
+              resource.confirm unless resource.confirmed?
+            end
           end
         rescue => e
           # Log the error but don't fail the signup

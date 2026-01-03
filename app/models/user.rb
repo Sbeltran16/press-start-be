@@ -19,13 +19,17 @@ class User < ApplicationRecord
     
     unless smtp_username.present? && smtp_password.present? && smtp_address.present?
       Rails.logger.warn "SMTP not fully configured - cannot send confirmation email for user #{id}"
-      raise "SMTP configuration incomplete: username=#{smtp_username.present?}, password=#{smtp_password.present?}, address=#{smtp_address.present?}"
+      # Don't raise - let the controller handle it
+      return false
     end
     
-    UserMailer.confirmation_instructions(self, @raw_confirmation_token).deliver_now
-  rescue => e
-    Rails.logger.error "Email delivery failed for user #{id}: #{e.class} - #{e.message}"
-    raise e
+    begin
+      UserMailer.confirmation_instructions(self, @raw_confirmation_token).deliver_now
+      true
+    rescue => e
+      Rails.logger.error "Email delivery failed for user #{id}: #{e.class} - #{e.message}"
+      false
+    end
   end
   
   # Override to generate confirmation token
