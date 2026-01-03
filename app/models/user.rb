@@ -20,7 +20,10 @@ class User < ApplicationRecord
     self.confirmation_token = Devise.friendly_token
     self.confirmation_sent_at = Time.now.utc
     @raw_confirmation_token = confirmation_token
-    save(validate: false)
+    unless save(validate: false)
+      Rails.logger.error "Failed to save confirmation token: #{errors.full_messages.inspect}"
+      raise "Failed to generate confirmation token"
+    end
   end
 
   has_one_attached :profile_picture

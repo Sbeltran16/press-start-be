@@ -7,12 +7,17 @@ class UserSerializer
   end
 
   attribute :profile_picture_url do |user|
-    if user.profile_picture.attached?
-      Rails.application.routes.url_helpers.rails_representation_url(
-        user.profile_picture.variant(resize_to_limit: [200, 200]).processed,
-        only_path: false
-      )
-    else
+    begin
+      if user.profile_picture.attached?
+        Rails.application.routes.url_helpers.rails_representation_url(
+          user.profile_picture.variant(resize_to_limit: [200, 200]).processed,
+          only_path: false
+        )
+      else
+        nil
+      end
+    rescue => e
+      Rails.logger.error "Error generating profile picture URL: #{e.message}"
       nil
     end
   end

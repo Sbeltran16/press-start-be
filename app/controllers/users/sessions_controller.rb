@@ -28,7 +28,6 @@ class Users::SessionsController < Devise::SessionsController
     }, status: :ok
   end
 
-
   def respond_to_on_destroy
     if request.headers['Authorization'].present?
       jwt_payload = JWT.decode(
