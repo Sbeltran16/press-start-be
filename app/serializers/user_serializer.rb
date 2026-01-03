@@ -2,6 +2,10 @@ class UserSerializer
   include JSONAPI::Serializer
   attributes :id, :email, :username, :bio, :created_at
 
+  attribute :email_confirmed do |user|
+    user.confirmed?
+  end
+
   attribute :profile_picture_url do |user|
     if user.profile_picture.attached?
       Rails.application.routes.url_helpers.rails_representation_url(

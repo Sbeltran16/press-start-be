@@ -1,4 +1,6 @@
 class Api::GamesController < ApplicationController
+  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id]
+  skip_before_action :check_email_confirmation, only: [:index, :popular, :top, :show_by_name, :show_by_id]
   before_action :authenticate_user!, only: [:user_game_status]
   require 'net/http'
   require 'json'
@@ -29,26 +31,89 @@ class Api::GamesController < ApplicationController
 
   def popular
     top_game_ids = GameScoreService.top_game_ids(limit: 12)
+    
+    # If no game IDs found, fallback to top games by likes
+    if top_game_ids.empty?
+      top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
+    end
+    
+    # If still empty, return empty array instead of error
+    if top_game_ids.empty?
+      render json: []
+      return
+    end
+    
     fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
     where_clause = "where id = (#{top_game_ids.join(',')});"
     games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 6)
 
-    if games
+    if games && games.any?
       scores = GameScoreService.scores_for(top_game_ids)
       games_with_scores = games.map do |game|
-        game["score"] = scores[game["id"]]
+        game["score"] = scores[game["id"]] || 0
         game
       end
       render json: games_with_scores
     else
-      render json: { error: "Failed to fetch games" }, status: :bad_request
+      # Return empty array instead of error for better UX
+      render json: []
     end
   end
 
   def top
+    Rails.logger.info("Top games endpoint called")
+    
+    # Check if IGDB credentials are configured
+    unless ENV['TWITCH_CLIENT_ID'] && ENV['TWITCH_CLIENT_SECRET']
+      Rails.logger.error("IGDB credentials not configured")
+      render json: { error: "IGDB API not configured" }, status: :service_unavailable
+      return
+    end
+
     top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
+    Rails.logger.info("Top game IDs from database: #{top_game_ids.length}")
 
     fields = "name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name"
+    
+    # If no game likes exist, fetch popular games from IGDB directly
+    if top_game_ids.empty?
+      Rails.logger.info("No game likes found, fetching from IGDB")
+      # Fetch popular games from IGDB (highly rated games with covers)
+      # Use a broader query that's more likely to return results
+      games = IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: "where rating >= 75 & cover != null & first_release_date > 946684800;",
+        limit: 12
+      )
+      
+      if games && games.any?
+        Rails.logger.info("IGDB returned #{games.length} games")
+        # Sort by rating descending, then by release date
+        games = games.sort_by { |g| [-(g["rating"] || 0), -(g["first_release_date"] || 0)] }
+        render json: games
+      else
+        Rails.logger.warn("First IGDB query returned no games, trying fallback")
+        # Try an even simpler query as last resort
+        fallback_games = IgdbService.fetch_games(
+          query: "",
+          fields: fields,
+          where_clause: "where cover != null & rating != null;",
+          limit: 12
+        )
+        
+        if fallback_games && fallback_games.any?
+          Rails.logger.info("Fallback IGDB query returned #{fallback_games.length} games")
+          fallback_games = fallback_games.sort_by { |g| -(g["rating"] || 0) }
+          render json: fallback_games
+        else
+          Rails.logger.error("All IGDB queries returned no games")
+          render json: []
+        end
+      end
+      return
+    end
+
     where_clause = "where id = (#{top_game_ids.join(',')});"
 
     games = IgdbService.fetch_games(
@@ -58,10 +123,23 @@ class Api::GamesController < ApplicationController
       limit: 12
     )
 
-    if games
+    if games && games.any?
       render json: games
     else
-      render json: { error: "Failed to fetch games" }, status: :bad_request
+      # Fallback to popular IGDB games if database games fail
+      fallback_games = IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: "where rating >= 80 & cover != null;",
+        limit: 12
+      )
+      
+      if fallback_games && fallback_games.any?
+        fallback_games = fallback_games.sort_by { |g| -(g["rating"] || 0) }
+        render json: fallback_games
+      else
+        render json: []
+      end
     end
   end
 

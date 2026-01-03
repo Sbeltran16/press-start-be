@@ -1,5 +1,6 @@
 class Api::GameListsController < ApplicationController
-  before_action :authenticate_user!, except: [:index, :show]
+  before_action :authenticate_user!, except: [:index, :show, :popular]
+  skip_before_action :check_email_confirmation, only: [:index, :show, :popular]
   before_action :set_game_list, only: [:show, :update, :destroy]
 
   def index
@@ -11,6 +12,20 @@ class Api::GameListsController < ApplicationController
       return render json: { error: "Unauthorized" }, status: :unauthorized unless current_user
       lists = current_user.game_lists.order(updated_at: :desc)
     end
+
+    render json: {
+      data: lists.map { |list| GameListSerializer.new(list, { params: { current_user: current_user } }).serializable_hash[:data][:attributes] }
+    }
+  end
+
+  def popular
+    # Get all public lists, sorted by likes_count and updated_at
+    # Use a left join to count likes and order by that count
+    lists = GameList.includes(:user, :list_likes)
+                    .left_joins(:list_likes)
+                    .group('game_lists.id')
+                    .order('COUNT(list_likes.id) DESC, game_lists.updated_at DESC')
+                    .limit(10)
 
     render json: {
       data: lists.map { |list| GameListSerializer.new(list, { params: { current_user: current_user } }).serializable_hash[:data][:attributes] }

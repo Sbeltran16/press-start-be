@@ -57,6 +57,9 @@ Rails.application.routes.draw do
 
     #Game Lists
     resources :game_lists, only: [:index, :show, :create, :update, :destroy] do
+      collection do
+        get 'popular', to: 'game_lists#popular'
+      end
       post 'items', to: 'game_list_items#create'
       delete 'items', to: 'game_list_items#destroy'
       post 'like', to: 'list_likes#create'
@@ -96,6 +99,13 @@ Rails.application.routes.draw do
   #User routes
   get "/me", to: "users#me"
   get '/users/:username', to: 'users#show'
+  get '/api/users/search', to: 'users#search'
   patch "/users/update_picture", to: "users#update_picture"
+
+  # Email confirmation routes
+  namespace :api do
+    get 'email_confirmations/confirm', to: 'email_confirmations#confirm'
+    post 'email_confirmations/resend', to: 'email_confirmations#resend'
+  end
 
 end

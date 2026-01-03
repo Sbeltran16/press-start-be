@@ -178,7 +178,11 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.string "username"
     t.text "bio"
     t.integer "favorite_game_ids", default: [], array: true
+    t.string "confirmation_token"
+    t.datetime "confirmed_at"
+    t.datetime "confirmation_sent_at"
     t.index "lower((username)::text)", name: "index_users_on_lower_username", unique: true
+    t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["jti"], name: "index_users_on_jti", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true

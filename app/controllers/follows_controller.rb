@@ -1,5 +1,6 @@
 class FollowsController < ApplicationController
-  before_action :authenticate_user!
+  before_action :authenticate_user!, except: [:followers, :following]
+  skip_before_action :check_email_confirmation, only: [:followers, :following]
 
   def create
     user = User.find(params[:followed_id])

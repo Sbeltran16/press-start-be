@@ -30,9 +30,24 @@ Rails.application.configure do
   config.active_storage.service = :local
 
   # Don't care if the mailer can't send.
-  config.action_mailer.raise_delivery_errors = false
+  config.action_mailer.raise_delivery_errors = true
 
   config.action_mailer.perform_caching = false
+  
+  # Mailer configuration
+  config.action_mailer.delivery_method = :smtp
+  config.action_mailer.smtp_settings = {
+    address: ENV['SMTP_ADDRESS'] || 'smtp.gmail.com',
+    port: ENV['SMTP_PORT'] || 587,
+    domain: ENV['SMTP_DOMAIN'] || 'gmail.com',
+    user_name: ENV['SMTP_USERNAME'],
+    password: ENV['SMTP_PASSWORD'],
+    authentication: 'plain',
+    enable_starttls_auto: true
+  }
+  
+  # For development, you can use letter_opener gem to preview emails
+  # config.action_mailer.delivery_method = :letter_opener
 
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
@@ -57,6 +72,9 @@ Rails.application.configure do
 
   # config/environments/development.rb
   Rails.application.routes.default_url_options[:host] = ENV['PRESS_START_HOST'] || 'localhost:3001'
+  
+  # Set default FRONTEND_URL for development if not set
+  ENV['FRONTEND_URL'] ||= 'http://localhost:3000'
 
   # Raises error for missing translations.
   # config.i18n.raise_on_missing_translations = true

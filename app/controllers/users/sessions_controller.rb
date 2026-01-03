@@ -6,17 +6,27 @@ class Users::SessionsController < Devise::SessionsController
   private
 
   def respond_with(current_user, _opts = {})
-  token = Warden::JWTAuth::UserEncoder.new.call(current_user, :user, nil).first
-  Rails.logger.info "Generated JWT token: #{token}"
+    # Check if email is confirmed
+    unless current_user.confirmed?
+      render json: {
+        status: { code: 403, message: 'Please confirm your email address before logging in.' },
+        email_confirmed: false,
+        email: current_user.email
+      }, status: :forbidden
+      return
+    end
 
-  response.set_header('Authorization', "Bearer #{token}")
-  Rails.logger.info "Response headers: #{response.headers.to_h}"
+    token = Warden::JWTAuth::UserEncoder.new.call(current_user, :user, nil).first
+    Rails.logger.info "Generated JWT token: #{token}"
 
-  render json: {
-    status: { code: 200, message: 'Logged in successfully.' },
-    data: UserSerializer.new(current_user).serializable_hash[:data][:attributes]
-  }, status: :ok
-end
+    response.set_header('Authorization', "Bearer #{token}")
+    Rails.logger.info "Response headers: #{response.headers.to_h}"
+
+    render json: {
+      status: { code: 200, message: 'Logged in successfully.' },
+      data: UserSerializer.new(current_user).serializable_hash[:data][:attributes]
+    }, status: :ok
+  end
 
 
   def respond_to_on_destroy

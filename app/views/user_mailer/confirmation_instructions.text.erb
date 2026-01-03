@@ -1,0 +1,13 @@
+Hi <%= @user.username %>,
+
+Welcome to Press Start! Please confirm your email address to complete your account setup.
+
+Confirm your email by clicking this link:
+<%= @confirmation_url %>
+
+This link will expire in 24 hours.
+
+If you didn't create an account with Press Start, you can safely ignore this email.
+
+© <%= Date.current.year %> Press Start. All rights reserved.
+

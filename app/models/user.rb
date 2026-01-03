@@ -2,7 +2,26 @@ class User < ApplicationRecord
   include Devise::JWT::RevocationStrategies::JTIMatcher
 
   devise :database_authenticatable, :registerable, :validatable,
-         :jwt_authenticatable, jwt_revocation_strategy: self
+         :jwt_authenticatable, :confirmable,
+         jwt_revocation_strategy: self,
+         confirmation_keys: [:email]
+  
+  # Override Devise's confirmation email to use our custom mailer
+  def send_confirmation_instructions
+    unless @raw_confirmation_token
+      generate_confirmation_token!
+    end
+    
+    UserMailer.confirmation_instructions(self, @raw_confirmation_token).deliver_now
+  end
+  
+  # Override to generate confirmation token
+  def generate_confirmation_token!
+    self.confirmation_token = Devise.friendly_token
+    self.confirmation_sent_at = Time.now.utc
+    @raw_confirmation_token = confirmation_token
+    save(validate: false)
+  end
 
   has_one_attached :profile_picture
   validates :username, presence: true, uniqueness: { case_sensitive: false }
