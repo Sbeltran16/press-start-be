@@ -6,8 +6,20 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
   def respond_with(resource, _opts = {})
     if request.method == "POST" && resource.persisted?
-      # Send confirmation email
-      resource.send_confirmation_instructions unless resource.confirmed?
+      # Send confirmation email with error handling
+      # Only send if SMTP is configured
+      if ENV['SMTP_USERNAME'].present? && ENV['SMTP_PASSWORD'].present?
+        begin
+          resource.send_confirmation_instructions unless resource.confirmed?
+        rescue => e
+          # Log the error but don't fail the signup
+          Rails.logger.error "Failed to send confirmation email: #{e.message}"
+          Rails.logger.error e.backtrace.join("\n")
+          # Continue with signup even if email fails
+        end
+      else
+        Rails.logger.warn "SMTP not configured - skipping confirmation email for user #{resource.id}"
+      end
       
       # Don't generate JWT token yet - user needs to confirm email first
       render json: {
