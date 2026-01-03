@@ -29,4 +29,8 @@ class UserSerializer
   attribute :games_count do |user|
     user.reviews.distinct.count(:igdb_game_id)
   end
+
+  attribute :lists_count do |user|
+    user.game_lists.count
+  end
 end
