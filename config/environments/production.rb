@@ -95,7 +95,10 @@ Rails.application.configure do
   config.action_mailer.smtp_settings = smtp_config
   
   # Log SMTP configuration status on startup (without exposing passwords)
-  Rails.logger.info "SMTP Config Status: address=#{ENV['SMTP_ADDRESS'].present? ? 'SET' : 'NOT SET'}, username=#{ENV['SMTP_USERNAME'].present? ? 'SET' : 'NOT SET'}, password=#{ENV['SMTP_PASSWORD'].present? ? 'SET' : 'NOT SET'}, domain=#{smtp_config[:domain]}"
+  # Only log if Rails.logger is available (not during asset precompilation)
+  if defined?(Rails) && Rails.logger
+    Rails.logger.info "SMTP Config Status: address=#{ENV['SMTP_ADDRESS'].present? ? 'SET' : 'NOT SET'}, username=#{ENV['SMTP_USERNAME'].present? ? 'SET' : 'NOT SET'}, password=#{ENV['SMTP_PASSWORD'].present? ? 'SET' : 'NOT SET'}, domain=#{smtp_config[:domain]}"
+  end
   # Set default FRONTEND_URL for production if not set
   ENV['FRONTEND_URL'] ||= 'https://pressstart.gg'
   config.action_mailer.default_url_options = { host: 'pressstart.gg', protocol: 'https' }

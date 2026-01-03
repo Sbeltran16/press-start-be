@@ -17,8 +17,8 @@ Rails.application.routes.draw do
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
 
-  # Defines the root path route ("/")
-  # root "posts#index"
+  # Root path - redirect to health check or return API info
+  root to: proc { |env| [200, { 'Content-Type' => 'application/json' }, [{ status: 'ok', service: 'Press Start API', version: '1.0' }.to_json]] }
 
   #Activities Routes
   get "/api/activity_feed", to: "activities#feed"
