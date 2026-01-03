@@ -55,6 +55,14 @@ Rails.application.routes.draw do
     post 'backlog_games', to: 'backlog_games#create'
     delete 'backlog_games', to: 'backlog_games#destroy'
 
+    #Game Lists
+    resources :game_lists, only: [:index, :show, :create, :update, :destroy] do
+      post 'items', to: 'game_list_items#create'
+      delete 'items', to: 'game_list_items#destroy'
+      post 'like', to: 'list_likes#create'
+      delete 'unlike', to: 'list_likes#destroy'
+    end
+
     #User Review Routes
     resources :users, only: [] do
       get 'reviews', to: 'reviews#user_reviews', on: :member

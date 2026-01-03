@@ -77,6 +77,27 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.index ["user_id"], name: "index_game_likes_on_user_id"
   end
 
+  create_table "game_list_items", force: :cascade do |t|
+    t.bigint "game_list_id", null: false
+    t.bigint "igdb_game_id", null: false
+    t.integer "position", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_list_id", "igdb_game_id"], name: "index_game_list_items_on_game_list_id_and_igdb_game_id", unique: true
+    t.index ["game_list_id", "position"], name: "index_game_list_items_on_game_list_id_and_position"
+    t.index ["game_list_id"], name: "index_game_list_items_on_game_list_id"
+  end
+
+  create_table "game_lists", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["user_id", "name"], name: "index_game_lists_on_user_id_and_name", unique: true
+    t.index ["user_id"], name: "index_game_lists_on_user_id"
+  end
+
   create_table "game_plays", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "igdb_game_id"
@@ -92,6 +113,16 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["user_id"], name: "index_game_views_on_user_id"
+  end
+
+  create_table "list_likes", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "game_list_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_list_id"], name: "index_list_likes_on_game_list_id"
+    t.index ["user_id", "game_list_id"], name: "index_list_likes_on_user_id_and_game_list_id", unique: true
+    t.index ["user_id"], name: "index_list_likes_on_user_id"
   end
 
   create_table "ratings", force: :cascade do |t|
@@ -160,8 +191,12 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
   add_foreign_key "follows", "users", column: "followed_id"
   add_foreign_key "follows", "users", column: "follower_id"
   add_foreign_key "game_likes", "users"
+  add_foreign_key "game_list_items", "game_lists"
+  add_foreign_key "game_lists", "users"
   add_foreign_key "game_plays", "users"
   add_foreign_key "game_views", "users"
+  add_foreign_key "list_likes", "game_lists"
+  add_foreign_key "list_likes", "users"
   add_foreign_key "ratings", "users"
   add_foreign_key "review_comments", "reviews"
   add_foreign_key "review_comments", "users"

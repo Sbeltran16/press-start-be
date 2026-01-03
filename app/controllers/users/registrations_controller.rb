@@ -6,6 +6,10 @@ class Users::RegistrationsController < Devise::RegistrationsController
 
   def respond_with(resource, _opts = {})
     if request.method == "POST" && resource.persisted?
+      # Generate JWT token for the newly created user
+      token = Warden::JWTAuth::UserEncoder.new.call(resource, :user, nil).first
+      response.set_header('Authorization', "Bearer #{token}")
+      
       render json: {
         status: {code: 200, message: "Signed up sucessfully."},
         data: UserSerializer.new(resource).serializable_hash[:data][:attributes]
