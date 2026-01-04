@@ -181,6 +181,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.string "confirmation_token"
     t.datetime "confirmed_at"
     t.datetime "confirmation_sent_at"
+    t.string "location"
     t.index "lower((username)::text)", name: "index_users_on_lower_username", unique: true
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true

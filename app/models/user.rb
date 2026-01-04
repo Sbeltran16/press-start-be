@@ -52,7 +52,7 @@ class User < ApplicationRecord
   end
 
   has_one_attached :profile_picture
-  validates :username, presence: true, uniqueness: { case_sensitive: false }
+  validates :username, presence: true, uniqueness: { case_sensitive: false }, length: { minimum: 3, maximum: 30 }
   validates :bio, length: { maximum: 500 }
 
   #User Reviews Relations

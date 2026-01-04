@@ -101,6 +101,8 @@ Rails.application.routes.draw do
   get '/users/:username', to: 'users#show'
   get '/api/users/search', to: 'users#search'
   patch "/users/update_picture", to: "users#update_picture"
+  patch "/users/update", to: "users#update"
+  get "/users/check_username", to: "users#check_username"
 
   # Email confirmation routes
   namespace :api do

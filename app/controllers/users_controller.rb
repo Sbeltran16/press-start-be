@@ -1,5 +1,5 @@
 class UsersController < ApplicationController
-  before_action :authenticate_user!, only: [:me, :update_picture]
+  before_action :authenticate_user!, only: [:me, :update_picture, :update, :check_username]
   skip_before_action :authenticate_user!, only: [:show, :search]
   skip_before_action :check_email_confirmation, only: [:show, :search]
 
@@ -50,10 +50,53 @@ class UsersController < ApplicationController
     end
   end
 
+  def update
+    if current_user.update(user_params)
+      render json: { 
+        status: 200, 
+        data: UserSerializer.new(current_user).serializable_hash[:data][:attributes] 
+      }
+    else
+      render json: { 
+        status: 422, 
+        errors: current_user.errors.full_messages 
+      }, status: :unprocessable_entity
+    end
+  end
+
+  def check_username
+    username = params[:username]&.strip
+    return render json: { available: false, error: "Username is required" }, status: :bad_request if username.blank?
+
+    # Validate username length
+    if username.length < 3
+      return render json: { 
+        available: false, 
+        message: "Username must be at least 3 characters" 
+      }
+    end
+
+    if username.length > 30
+      return render json: { 
+        available: false, 
+        message: "Username must be 30 characters or less" 
+      }
+    end
+
+    # Check if username is taken (excluding current user)
+    existing_user = User.where("LOWER(username) = ?", username.downcase)
+                        .where.not(id: current_user.id)
+                        .first
+
+    render json: { 
+      available: existing_user.nil?,
+      message: existing_user ? "Username is already taken" : "Username is available"
+    }
+  end
 
   private
 
   def user_params
-    params.require(:user).permit(:username, :email, :password, :bio, :profile_picture, :profile_banner)
+    params.require(:user).permit(:username, :email, :password, :bio, :location, :profile_picture, :profile_banner)
   end
 end

@@ -1,6 +1,6 @@
 class UserSerializer
   include JSONAPI::Serializer
-  attributes :id, :email, :username, :bio, :created_at
+  attributes :id, :email, :username, :bio, :location, :created_at
 
   attribute :email_confirmed do |user|
     user.confirmed?
@@ -41,5 +41,10 @@ class UserSerializer
 
   attribute :lists_count do |user|
     user.game_lists.count
+  end
+
+  attribute :likes_count do |user|
+    # Total likes on all reviews by this user
+    ReviewLike.joins(:review).where(reviews: { user_id: user.id }).count
   end
 end
