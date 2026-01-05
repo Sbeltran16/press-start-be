@@ -88,6 +88,10 @@ class User < ApplicationRecord
   has_one_attached :profile_picture
   validates :username, presence: true, uniqueness: { case_sensitive: false }, length: { minimum: 3, maximum: 30 }
   validates :bio, length: { maximum: 500 }
+  
+  # Validate email domain to ensure it's a real email provider
+  # Devise's validatable already validates email format, this adds domain validation
+  validates :email, email_domain: true, if: -> { email.present? }
 
   #User Reviews Relations
   has_many :reviews, dependent: :destroy
