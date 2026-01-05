@@ -5,11 +5,16 @@ namespace :users do
     puts "This includes: reviews, ratings, comments, likes, lists, follows, etc."
     puts ""
     print "Type 'DELETE ALL USERS' to confirm: "
-    confirmation = STDIN.gets.chomp
-    
-    unless confirmation == 'DELETE ALL USERS'
-      puts "❌ Deletion cancelled."
-      exit
+    begin
+      confirmation = STDIN.gets&.chomp
+      unless confirmation == 'DELETE ALL USERS'
+        puts "❌ Deletion cancelled."
+        exit
+      end
+    rescue => e
+      puts "❌ Error reading confirmation: #{e.message}"
+      puts "   This task requires interactive input. Use Rails console instead."
+      exit 1
     end
     
     puts "\n🗑️  Starting deletion process..."

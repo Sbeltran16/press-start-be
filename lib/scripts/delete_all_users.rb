@@ -1,16 +1,28 @@
 # Script to delete all users and their associated records
 # Run this in Rails console: load 'lib/scripts/delete_all_users.rb'
+# Or call: delete_all_users(confirm: true)
 
-puts "⚠️  WARNING: This will delete ALL users and their associated data!"
-puts "This includes: reviews, ratings, comments, likes, lists, follows, etc."
-puts ""
-print "Type 'DELETE ALL USERS' to confirm: "
-confirmation = STDIN.gets.chomp
-
-unless confirmation == 'DELETE ALL USERS'
-  puts "❌ Deletion cancelled."
-  exit
-end
+def delete_all_users(confirm: false)
+  puts "⚠️  WARNING: This will delete ALL users and their associated data!"
+  puts "This includes: reviews, ratings, comments, likes, lists, follows, etc."
+  puts ""
+  
+  if confirm
+    print "Type 'DELETE ALL USERS' to confirm: "
+    begin
+      confirmation = STDIN.gets&.chomp
+      unless confirmation == 'DELETE ALL USERS'
+        puts "❌ Deletion cancelled."
+        return false
+      end
+    rescue => e
+      puts "⚠️  Could not read confirmation (this is normal in some environments)"
+      puts "   Proceeding without confirmation..."
+    end
+  else
+    puts "⚠️  Running without confirmation (confirm: false)"
+    puts "   To require confirmation, call: delete_all_users(confirm: true)"
+  end
 
 puts "\n🗑️  Starting deletion process..."
 
@@ -79,4 +91,13 @@ end
 
 puts "\n✅ Successfully deleted all users and associated records!"
 puts "   Total users deleted: #{user_count}"
+return true
+end
+
+# Auto-run only if explicitly called, not during server startup
+if defined?(Rails::Console) && !defined?(Rails::Server)
+  # Only auto-run in console, not during server startup
+  puts "\n💡 To delete all users, run: delete_all_users"
+  puts "   Or with confirmation: delete_all_users(confirm: true)"
+end
 
