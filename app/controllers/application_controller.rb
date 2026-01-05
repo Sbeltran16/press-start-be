@@ -19,12 +19,12 @@ class ApplicationController < ActionController::API
     return if controller_name == 'email_confirmations'
     return unless current_user # Only check if user is authenticated
     
+    # Allow unconfirmed users to access their accounts (for existing users who signed up before email was configured)
+    # They can still use the app, but email confirmation is recommended
     if !current_user.confirmed?
-      render json: { 
-        error: "Please confirm your email address to continue",
-        email_confirmed: false,
-        email: current_user.email
-      }, status: :forbidden
+      Rails.logger.info "User #{current_user.id} (#{current_user.email}) accessing account without email confirmation"
+      # Don't block - allow them to use the app
+      # The frontend can show a banner prompting them to confirm their email
     end
   end
 end

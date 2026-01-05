@@ -6,10 +6,16 @@ class UserMailer < ApplicationMailer
     frontend_url = ENV['FRONTEND_URL'] || (Rails.env.production? ? 'https://pressstart.gg' : 'http://localhost:3000')
     @confirmation_url = "#{frontend_url}/verify-email?token=#{token}"
     
-    mail(
-      to: @user.email,
-      subject: 'Confirm your Press Start account'
-    )
+    begin
+      mail(
+        to: @user.email,
+        subject: 'Confirm your Press Start account'
+      )
+    rescue => e
+      Rails.logger.error "Failed to create mail object for #{user.email}: #{e.class} - #{e.message}"
+      Rails.logger.error "Backtrace: #{e.backtrace.first(10).join("\n")}"
+      raise e
+    end
   end
 end
 

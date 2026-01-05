@@ -29,13 +29,24 @@ class User < ApplicationRecord
     begin
       mail = UserMailer.confirmation_instructions(self, @raw_confirmation_token)
       Rails.logger.info "Mailer created successfully, attempting delivery..."
+      Rails.logger.info "SMTP settings: address=#{ActionMailer::Base.smtp_settings[:address]}, port=#{ActionMailer::Base.smtp_settings[:port]}, domain=#{ActionMailer::Base.smtp_settings[:domain]}"
+      Rails.logger.info "From address: #{mail.from}, To: #{mail.to}"
+      
       result = mail.deliver_now
-      Rails.logger.info "Email sent successfully to #{email} for user #{id}"
-      Rails.logger.info "Email subject: #{mail.subject}, To: #{mail.to}"
+      Rails.logger.info "✅ Email sent successfully to #{email} for user #{id}"
+      Rails.logger.info "Email subject: #{mail.subject}, Message ID: #{mail.message_id}"
       true
+    rescue Net::SMTPAuthenticationError => e
+      Rails.logger.error "❌ SMTP Authentication failed for user #{id} (#{email}): #{e.message}"
+      Rails.logger.error "Check SMTP_USERNAME and SMTP_PASSWORD environment variables"
+      false
+    rescue Net::SMTPError => e
+      Rails.logger.error "❌ SMTP Error for user #{id} (#{email}): #{e.class} - #{e.message}"
+      Rails.logger.error "Check SMTP_ADDRESS and SMTP_PORT environment variables"
+      false
     rescue => e
-      Rails.logger.error "Email delivery failed for user #{id} (#{email}): #{e.class} - #{e.message}"
-      Rails.logger.error "Backtrace: #{e.backtrace.first(5).join("\n")}"
+      Rails.logger.error "❌ Email delivery failed for user #{id} (#{email}): #{e.class} - #{e.message}"
+      Rails.logger.error "Backtrace: #{e.backtrace.first(10).join("\n")}"
       false
     end
   end
