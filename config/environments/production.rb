@@ -123,5 +123,6 @@ Rails.application.configure do
   #   /.*\.example\.com/ # Allow requests from subdomains like `www.example.com`
   # ]
   # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  # This allows Render's health checks to work without host authorization issues
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" || request.path == "/" } }
 end
