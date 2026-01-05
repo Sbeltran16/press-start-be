@@ -71,25 +71,51 @@ Rails.application.configure do
   # Mailer configuration for production
   config.action_mailer.delivery_method = :smtp
   
-  # Build SMTP settings dynamically
-  smtp_config = {
-    address: ENV['SMTP_ADDRESS'] || 'smtp.gmail.com',
-    port: (ENV['SMTP_PORT'] || 587).to_i,
-    authentication: 'plain',
-    enable_starttls_auto: true
-  }
-  
-  # Add credentials only if present
-  smtp_config[:user_name] = ENV['SMTP_USERNAME'] if ENV['SMTP_USERNAME'].present?
-  smtp_config[:password] = ENV['SMTP_PASSWORD'] if ENV['SMTP_PASSWORD'].present?
-  
-  # Set domain
-  if ENV['SMTP_DOMAIN'].present?
-    smtp_config[:domain] = ENV['SMTP_DOMAIN']
-  elsif ENV['SMTP_ADDRESS'].present? && ENV['SMTP_ADDRESS'].include?('@')
-    smtp_config[:domain] = ENV['SMTP_ADDRESS'].split('@').last
+  # Support Mailgun, SendGrid, or Gmail based on environment variables
+  if ENV['MAILGUN_SMTP_LOGIN'].present? && ENV['MAILGUN_SMTP_PASSWORD'].present?
+    # Mailgun configuration (allows custom "From" addresses)
+    smtp_config = {
+      address: ENV['MAILGUN_SMTP_SERVER'] || 'smtp.mailgun.org',
+      port: (ENV['MAILGUN_SMTP_PORT'] || 587).to_i,
+      domain: ENV['MAILGUN_DOMAIN'] || ENV['SMTP_DOMAIN'],
+      user_name: ENV['MAILGUN_SMTP_LOGIN'],
+      password: ENV['MAILGUN_SMTP_PASSWORD'],
+      authentication: 'plain',
+      enable_starttls_auto: true
+    }
+    smtp_config.delete_if { |k, v| v.nil? }
+  elsif ENV['SENDGRID_API_KEY'].present?
+    # SendGrid configuration (allows custom "From" addresses)
+    smtp_config = {
+      address: ENV['SENDGRID_SMTP_SERVER'] || 'smtp.sendgrid.net',
+      port: (ENV['SENDGRID_SMTP_PORT'] || 587).to_i,
+      domain: ENV['SENDGRID_DOMAIN'] || ENV['SMTP_DOMAIN'] || 'heroku.com',
+      user_name: ENV['SENDGRID_USERNAME'] || 'apikey',
+      password: ENV['SENDGRID_API_KEY'],
+      authentication: 'plain',
+      enable_starttls_auto: true
+    }
   else
-    smtp_config[:domain] = 'gmail.com' # Default fallback
+    # Default: Gmail or generic SMTP (Gmail forces "From" to match authenticated email)
+    smtp_config = {
+      address: ENV['SMTP_ADDRESS'] || 'smtp.gmail.com',
+      port: (ENV['SMTP_PORT'] || 587).to_i,
+      authentication: 'plain',
+      enable_starttls_auto: true
+    }
+    
+    # Add credentials only if present
+    smtp_config[:user_name] = ENV['SMTP_USERNAME'] if ENV['SMTP_USERNAME'].present?
+    smtp_config[:password] = ENV['SMTP_PASSWORD'] if ENV['SMTP_PASSWORD'].present?
+    
+    # Set domain
+    if ENV['SMTP_DOMAIN'].present?
+      smtp_config[:domain] = ENV['SMTP_DOMAIN']
+    elsif ENV['SMTP_ADDRESS'].present? && ENV['SMTP_ADDRESS'].include?('@')
+      smtp_config[:domain] = ENV['SMTP_ADDRESS'].split('@').last
+    else
+      smtp_config[:domain] = 'gmail.com' # Default fallback
+    end
   end
   
   config.action_mailer.smtp_settings = smtp_config

@@ -11,8 +11,16 @@ class UserMailer < ApplicationMailer
     Rails.logger.info "UserMailer: From address will be: #{ENV['MAILER_FROM'] || 'noreply@pressstart.gg'}"
     
     begin
+      # Set display name to hide personal email
+      # Format: "Display Name <email@address.com>"
+      from_email = ENV['SMTP_USERNAME'] || ENV['MAILER_FROM'] || 'noreply@pressstart.gg'
+      display_name = ENV['MAILER_DISPLAY_NAME'] || 'Press Start'
+      from_address = "#{display_name} <#{from_email}>"
+      
       mail_result = mail(
         to: @user.email,
+        from: from_address,
+        reply_to: ENV['MAILER_REPLY_TO'] || from_email,
         subject: 'Confirm your Press Start account'
       )
       Rails.logger.info "UserMailer: Mail object created successfully"

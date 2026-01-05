@@ -1,6 +1,5 @@
 class Api::GameListsController < ApplicationController
   before_action :authenticate_user!, except: [:index, :show, :popular]
-  skip_before_action :check_email_confirmation, only: [:index, :show, :popular]
   before_action :set_game_list, only: [:show, :update, :destroy]
 
   def index

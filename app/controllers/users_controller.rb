@@ -1,7 +1,6 @@
 class UsersController < ApplicationController
   before_action :authenticate_user!, only: [:me, :update_picture, :update, :check_username]
   skip_before_action :authenticate_user!, only: [:show, :search]
-  skip_before_action :check_email_confirmation, only: [:show, :search]
 
   def me
     if current_user

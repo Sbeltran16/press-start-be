@@ -6,13 +6,7 @@ class Users::SessionsController < Devise::SessionsController
   private
 
   def respond_with(current_user, _opts = {})
-    # Allow unconfirmed users to log in (for existing users who signed up before email was configured)
-    # They can still use the app, but will be prompted to confirm email
-    unless current_user.confirmed?
-      Rails.logger.warn "User #{current_user.id} (#{current_user.email}) logged in without email confirmation"
-      # Continue with login - don't block them
-    end
-
+    # Email confirmation disabled - all users can log in immediately
     # Determine expiration time based on user preferences
     expiration_time = determine_expiration_time
 

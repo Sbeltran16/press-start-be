@@ -1,6 +1,5 @@
 class Api::GamesController < ApplicationController
   skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id]
-  skip_before_action :check_email_confirmation, only: [:index, :popular, :top, :show_by_name, :show_by_id]
   before_action :authenticate_user!, only: [:user_game_status]
   require 'net/http'
   require 'json'

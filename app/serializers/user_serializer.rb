@@ -3,7 +3,8 @@ class UserSerializer
   attributes :id, :email, :username, :bio, :location, :created_at
 
   attribute :email_confirmed do |user|
-    user.confirmed?
+    # Email confirmation disabled - all users are considered confirmed
+    user.confirmed_at.present? || true
   end
 
   attribute :profile_picture_url do |user|

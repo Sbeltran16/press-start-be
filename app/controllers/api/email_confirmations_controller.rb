@@ -1,6 +1,6 @@
 class Api::EmailConfirmationsController < ApplicationController
   skip_before_action :authenticate_user!
-  skip_before_action :check_email_confirmation
+  # Email confirmation disabled - this controller is kept for future use
 
   # GET /api/email_confirmations/confirm?confirmation_token=xxx
   def confirm
@@ -18,7 +18,8 @@ class Api::EmailConfirmationsController < ApplicationController
       return
     end
 
-    if user.confirmed?
+    # Email confirmation disabled - check confirmed_at directly
+    if user.confirmed_at.present?
       render json: { 
         message: "Email already confirmed",
         email_confirmed: true
@@ -36,7 +37,8 @@ class Api::EmailConfirmationsController < ApplicationController
       return
     end
 
-    if user.confirm
+    # Email confirmation disabled - manually set confirmed_at
+    if user.update_column(:confirmed_at, Time.current)
       # Generate JWT token after confirmation
       token = Warden::JWTAuth::UserEncoder.new.call(user, :user, nil).first
       
@@ -73,7 +75,8 @@ class Api::EmailConfirmationsController < ApplicationController
       return
     end
 
-    if user.confirmed?
+    # Email confirmation disabled - check confirmed_at directly
+    if user.confirmed_at.present?
       render json: { 
         message: "Email is already confirmed",
         email_confirmed: true

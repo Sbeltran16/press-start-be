@@ -143,7 +143,7 @@ Devise.setup do |config|
   # without confirming their account.
   # Default is 0.days, meaning the user cannot access the website without
   # confirming their account.
-  # Allow unconfirmed users to access the app (they'll be prompted to confirm email)
+  # Email confirmation disabled - users are auto-confirmed on signup
   config.allow_unconfirmed_access_for = nil
 
   # A period that the user is allowed to confirm their account before their

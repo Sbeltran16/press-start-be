@@ -2,11 +2,17 @@ class User < ApplicationRecord
   include Devise::JWT::RevocationStrategies::JTIMatcher
 
   devise :database_authenticatable, :registerable, :validatable,
-         :jwt_authenticatable, :confirmable,
-         jwt_revocation_strategy: self,
-         confirmation_keys: [:email]
+         :jwt_authenticatable,
+         jwt_revocation_strategy: self
   
-  # Override Devise's confirmation email to use our custom mailer
+  # Auto-confirm users on creation (email confirmation disabled)
+  after_create :auto_confirm_user
+  
+  def auto_confirm_user
+    update_column(:confirmed_at, Time.current) if confirmed_at.nil?
+  end
+  
+  # Keep method for future use (email confirmation disabled for now)
   def send_confirmation_instructions
     unless @raw_confirmation_token
       generate_confirmation_token!
@@ -25,9 +31,15 @@ class User < ApplicationRecord
     end
     
     Rails.logger.info "Attempting to send confirmation email to #{email} for user #{id}"
-    Rails.logger.info "SMTP settings: address=#{ActionMailer::Base.smtp_settings[:address]}, port=#{ActionMailer::Base.smtp_settings[:port]}, domain=#{ActionMailer::Base.smtp_settings[:domain]}"
+    
+    # Get SMTP settings from Rails config (more reliable than ActionMailer::Base)
+    smtp_settings = Rails.application.config.action_mailer.smtp_settings || ActionMailer::Base.smtp_settings
+    Rails.logger.info "SMTP settings: address=#{smtp_settings[:address]}, port=#{smtp_settings[:port]}, domain=#{smtp_settings[:domain]}"
     Rails.logger.info "SMTP username: #{ENV['SMTP_USERNAME']}"
+    Rails.logger.info "SMTP address from ENV: #{ENV['SMTP_ADDRESS']}"
+    Rails.logger.info "SMTP port from ENV: #{ENV['SMTP_PORT']}"
     Rails.logger.info "From address (MAILER_FROM): #{ENV['MAILER_FROM'] || 'noreply@pressstart.gg'}"
+    Rails.logger.info "ActionMailer delivery method: #{ActionMailer::Base.delivery_method}"
     
     begin
       mail = UserMailer.confirmation_instructions(self, @raw_confirmation_token)
@@ -39,17 +51,24 @@ class User < ApplicationRecord
       Rails.logger.info "✅ Email sent successfully to #{email} for user #{id}"
       Rails.logger.info "Email Message ID: #{mail.message_id}"
       Rails.logger.info "Email delivery result: #{result.inspect}"
+      Rails.logger.info "Email from: #{mail.from.inspect}, to: #{mail.to.inspect}"
       true
     rescue Net::SMTPAuthenticationError => e
-      Rails.logger.error "❌ SMTP Authentication failed for user #{id} (#{email}): #{e.message}"
-      Rails.logger.error "Check SMTP_USERNAME and SMTP_PASSWORD environment variables"
+      Rails.logger.error "❌ SMTP Authentication failed for user #{id} (#{email}): #{e.class} - #{e.message}"
+      Rails.logger.error "SMTP_USERNAME present: #{ENV['SMTP_USERNAME'].present?}"
+      Rails.logger.error "SMTP_PASSWORD present: #{ENV['SMTP_PASSWORD'].present?}"
+      Rails.logger.error "SMTP_ADDRESS: #{ENV['SMTP_ADDRESS']}"
+      Rails.logger.error "Check SMTP_USERNAME and SMTP_PASSWORD environment variables in Render dashboard"
       false
     rescue Net::SMTPError => e
       Rails.logger.error "❌ SMTP Error for user #{id} (#{email}): #{e.class} - #{e.message}"
-      Rails.logger.error "Check SMTP_ADDRESS and SMTP_PORT environment variables"
+      Rails.logger.error "SMTP_ADDRESS: #{ENV['SMTP_ADDRESS']}"
+      Rails.logger.error "SMTP_PORT: #{ENV['SMTP_PORT']}"
+      Rails.logger.error "Check SMTP_ADDRESS and SMTP_PORT environment variables in Render dashboard"
       false
     rescue => e
       Rails.logger.error "❌ Email delivery failed for user #{id} (#{email}): #{e.class} - #{e.message}"
+      Rails.logger.error "Error details: #{e.inspect}"
       Rails.logger.error "Backtrace: #{e.backtrace.first(10).join("\n")}"
       false
     end
