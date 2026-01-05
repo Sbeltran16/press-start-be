@@ -65,6 +65,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.integer "followed_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["followed_id"], name: "index_follows_on_followed_id"
     t.index ["follower_id", "followed_id"], name: "index_follows_on_follower_id_and_followed_id", unique: true
   end
 
@@ -73,6 +74,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.string "igdb_game_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["igdb_game_id"], name: "index_game_likes_on_igdb_game_id"
     t.index ["user_id", "igdb_game_id"], name: "index_game_likes_on_user_id_and_igdb_game_id", unique: true
     t.index ["user_id"], name: "index_game_likes_on_user_id"
   end
@@ -94,6 +96,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.text "description"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_game_lists_on_created_at"
     t.index ["user_id", "name"], name: "index_game_lists_on_user_id_and_name", unique: true
     t.index ["user_id"], name: "index_game_lists_on_user_id"
   end
@@ -103,6 +106,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.string "igdb_game_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["igdb_game_id"], name: "index_game_plays_on_igdb_game_id"
     t.index ["user_id", "igdb_game_id"], name: "index_game_plays_on_user_id_and_igdb_game_id", unique: true
     t.index ["user_id"], name: "index_game_plays_on_user_id"
   end
@@ -112,6 +116,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.integer "igdb_game_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["igdb_game_id"], name: "index_game_views_on_igdb_game_id"
     t.index ["user_id"], name: "index_game_views_on_user_id"
   end
 
@@ -131,6 +136,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.float "rating"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["igdb_game_id"], name: "index_ratings_on_igdb_game_id"
     t.index ["user_id", "igdb_game_id"], name: "index_ratings_on_user_id_and_igdb_game_id", unique: true
     t.index ["user_id"], name: "index_ratings_on_user_id"
   end
@@ -162,6 +168,8 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.text "comment"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_reviews_on_created_at"
+    t.index ["igdb_game_id"], name: "index_reviews_on_igdb_game_id"
     t.index ["user_id", "igdb_game_id"], name: "index_reviews_on_user_id_and_igdb_game_id", unique: true
     t.index ["user_id"], name: "index_reviews_on_user_id"
   end

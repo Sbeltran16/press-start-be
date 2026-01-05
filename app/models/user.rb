@@ -25,16 +25,20 @@ class User < ApplicationRecord
     end
     
     Rails.logger.info "Attempting to send confirmation email to #{email} for user #{id}"
+    Rails.logger.info "SMTP settings: address=#{ActionMailer::Base.smtp_settings[:address]}, port=#{ActionMailer::Base.smtp_settings[:port]}, domain=#{ActionMailer::Base.smtp_settings[:domain]}"
+    Rails.logger.info "SMTP username: #{ENV['SMTP_USERNAME']}"
+    Rails.logger.info "From address (MAILER_FROM): #{ENV['MAILER_FROM'] || 'noreply@pressstart.gg'}"
     
     begin
       mail = UserMailer.confirmation_instructions(self, @raw_confirmation_token)
       Rails.logger.info "Mailer created successfully, attempting delivery..."
-      Rails.logger.info "SMTP settings: address=#{ActionMailer::Base.smtp_settings[:address]}, port=#{ActionMailer::Base.smtp_settings[:port]}, domain=#{ActionMailer::Base.smtp_settings[:domain]}"
-      Rails.logger.info "From address: #{mail.from}, To: #{mail.to}"
+      Rails.logger.info "From address: #{mail.from.inspect}, To: #{mail.to.inspect}"
+      Rails.logger.info "Email subject: #{mail.subject}"
       
       result = mail.deliver_now
       Rails.logger.info "✅ Email sent successfully to #{email} for user #{id}"
-      Rails.logger.info "Email subject: #{mail.subject}, Message ID: #{mail.message_id}"
+      Rails.logger.info "Email Message ID: #{mail.message_id}"
+      Rails.logger.info "Email delivery result: #{result.inspect}"
       true
     rescue Net::SMTPAuthenticationError => e
       Rails.logger.error "❌ SMTP Authentication failed for user #{id} (#{email}): #{e.message}"

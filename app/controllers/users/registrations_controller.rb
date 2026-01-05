@@ -3,6 +3,26 @@ class Users::RegistrationsController < Devise::RegistrationsController
   skip_before_action :authenticate_user!
   skip_before_action :check_email_confirmation
   respond_to :json
+  
+  # Override create to prevent Devise from automatically sending confirmation emails
+  def create
+    build_resource(sign_up_params)
+    
+    # Skip Devise's automatic confirmation email sending
+    # We'll send it manually in respond_with
+    resource.skip_confirmation_notification!
+    
+    resource.save
+    yield resource if block_given?
+    if resource.persisted?
+      respond_with resource
+    else
+      clean_up_passwords resource
+      set_minimum_password_length
+      respond_with resource
+    end
+  end
+  
   private
 
   def respond_with(resource, _opts = {})
@@ -25,26 +45,31 @@ class Users::RegistrationsController < Devise::RegistrationsController
             email_sent = resource.send_confirmation_instructions
             
             if email_sent
-              Rails.logger.info "Confirmation email sent successfully to #{resource.email}"
+              Rails.logger.info "✅ Confirmation email sent successfully to #{resource.email}"
             else
-              Rails.logger.error "Failed to send confirmation email to #{resource.email} - user will need to confirm manually"
-              # Don't auto-confirm - let user confirm via resend email feature
+              Rails.logger.error "❌ Failed to send confirmation email to #{resource.email}"
+              Rails.logger.warn "Auto-confirming user #{resource.id} (#{resource.email}) since email sending failed"
+              # Auto-confirm if email sending fails so user can still use the app
+              resource.update_column(:confirmed_at, Time.current) unless resource.confirmed?
             end
           end
         rescue => e
           # Log the error but don't fail the signup
-          Rails.logger.error "Exception while sending confirmation email to #{resource.email}: #{e.class} - #{e.message}"
+          Rails.logger.error "❌ Exception while sending confirmation email to #{resource.email}: #{e.class} - #{e.message}"
           Rails.logger.error "Backtrace: #{e.backtrace.first(10).join("\n")}"
-          # Don't auto-confirm on exception - let user confirm via resend email feature
+          Rails.logger.warn "Auto-confirming user #{resource.id} (#{resource.email}) due to email sending exception"
+          # Auto-confirm on exception so user can still use the app
+          resource.update_column(:confirmed_at, Time.current) unless resource.confirmed?
         end
       else
         missing = []
         missing << "SMTP_USERNAME" unless smtp_username.present?
         missing << "SMTP_PASSWORD" unless smtp_password.present?
         missing << "SMTP_ADDRESS" unless smtp_address.present?
-        Rails.logger.error "SMTP not fully configured (missing: #{missing.join(', ')}) - cannot send confirmation email"
-        Rails.logger.error "User #{resource.id} (#{resource.email}) created but cannot receive confirmation email"
-        # Don't auto-confirm - user needs to configure SMTP or use resend feature
+        Rails.logger.warn "SMTP not fully configured (missing: #{missing.join(', ')}) - auto-confirming user"
+        Rails.logger.warn "User #{resource.id} (#{resource.email}) will be auto-confirmed since email is not configured"
+        # Auto-confirm if SMTP is not configured so users can still use the app
+        resource.update_column(:confirmed_at, Time.current) unless resource.confirmed?
       end
       
       # Generate appropriate message based on email confirmation status

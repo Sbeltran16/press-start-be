@@ -9,7 +9,7 @@ class Users::SessionsControllerTest < ActionDispatch::IntegrationTest
     )
   end
 
-  test "should not allow login for unconfirmed user" do
+  test "should allow login for unconfirmed user" do
     assert_not @user.confirmed?
     
     post "/login", params: {
@@ -19,10 +19,9 @@ class Users::SessionsControllerTest < ActionDispatch::IntegrationTest
       }
     }, as: :json
     
-    # Devise returns 401 for unconfirmed users, not 403
-    assert_response :unauthorized
-    json_response = JSON.parse(response.body)
-    assert_includes json_response["error"] || json_response["status"]&.dig("message") || "", "confirm"
+    # Users can now log in even if unconfirmed
+    assert_response :success
+    assert_not_nil response.headers["Authorization"]
   end
 
   test "should allow login for confirmed user" do
