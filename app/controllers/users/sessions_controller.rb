@@ -16,8 +16,12 @@ class Users::SessionsController < Devise::SessionsController
       return
     end
 
-    token = Warden::JWTAuth::UserEncoder.new.call(current_user, :user, nil).first
-    Rails.logger.info "Generated JWT token: #{token}"
+    # Determine expiration time based on user preferences
+    expiration_time = determine_expiration_time
+
+    # Generate JWT token with custom expiration
+    token = generate_jwt_token(current_user, expiration_time)
+    Rails.logger.info "Generated JWT token with expiration: #{expiration_time} seconds"
 
     response.set_header('Authorization', "Bearer #{token}")
     Rails.logger.info "Response headers: #{response.headers.to_h}"
@@ -28,11 +32,41 @@ class Users::SessionsController < Devise::SessionsController
     }, status: :ok
   end
 
+  def determine_expiration_time
+    # Get session preferences from request params
+    user_params = params[:user] || {}
+    remember_me = user_params[:remember_me].to_s == 'true' || user_params[:remember_me] == true
+
+    Rails.logger.info "Session preferences - remember_me: #{remember_me}"
+
+    if remember_me
+      # 30 days
+      30.days.to_i
+    else
+      # Default: 24 hours
+      24.hours.to_i
+    end
+  end
+
+  def generate_jwt_token(user, expiration_time)
+    payload = {
+      sub: user.id.to_s,
+      scp: 'user',
+      exp: Time.now.to_i + expiration_time,
+      iat: Time.now.to_i,
+      jti: user.jti
+    }
+
+    # Use the same secret as devise-jwt (from credentials)
+    secret = Rails.application.credentials.fetch(:secret_key_base)
+    JWT.encode(payload, secret, 'HS256')
+  end
+
   def respond_to_on_destroy
     if request.headers['Authorization'].present?
       jwt_payload = JWT.decode(
         request.headers['Authorization'].split(' ').last,
-        Rails.application.credentials.devise_jwt_secret_key!
+        Rails.application.credentials.fetch(:secret_key_base)
       ).first
       current_user = User.find(jwt_payload['sub'])
     end
