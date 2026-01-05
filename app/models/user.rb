@@ -56,12 +56,12 @@ class User < ApplicationRecord
   validates :bio, length: { maximum: 500 }
 
   #User Reviews Relations
-  has_many :reviews
-  has_many :review_likes
-  has_many :review_comments
+  has_many :reviews, dependent: :destroy
+  has_many :review_likes, dependent: :destroy
+  has_many :review_comments, dependent: :destroy
 
   #User Ratings Relations
-  has_many :ratings
+  has_many :ratings, dependent: :destroy
 
   ##User Game Interactions
   #Game Likes
