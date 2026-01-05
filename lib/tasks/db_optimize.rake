@@ -43,19 +43,27 @@ namespace :db do
     
     # Show index sizes
     puts "\n4. Largest indexes:"
-    index_result = ActiveRecord::Base.connection.execute(<<-SQL)
-      SELECT 
-        schemaname,
-        tablename,
-        indexname,
-        pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
-      FROM pg_stat_user_indexes
-      ORDER BY pg_relation_size(indexrelid) DESC
-      LIMIT 10;
-    SQL
-    
-    index_result.each do |row|
-      puts "   #{row['indexname']} on #{row['tablename']}: #{row['index_size']}"
+    begin
+      index_result = ActiveRecord::Base.connection.execute(<<-SQL)
+        SELECT 
+          i.relname AS indexname,
+          t.relname AS tablename,
+          pg_size_pretty(pg_relation_size(i.oid)) AS index_size
+        FROM pg_class i
+        JOIN pg_index idx ON i.oid = idx.indexrelid
+        JOIN pg_class t ON idx.indrelid = t.oid
+        JOIN pg_namespace n ON t.relnamespace = n.oid
+        WHERE n.nspname = 'public'
+          AND i.relkind = 'i'
+        ORDER BY pg_relation_size(i.oid) DESC
+        LIMIT 10;
+      SQL
+      
+      index_result.each do |row|
+        puts "   #{row['indexname']} on #{row['tablename']}: #{row['index_size']}"
+      end
+    rescue => e
+      puts "   ⚠️  Could not retrieve index sizes: #{e.message}"
     end
     
     puts "\n✅ Database optimization complete!"
