@@ -29,11 +29,27 @@ class Api::GamesController < ApplicationController
   end
 
   def popular
-    top_game_ids = GameScoreService.top_game_ids(limit: 12)
+    # Get time period from params (this_week, this_month, this_year, all_time)
+    time_period = params[:period] || 'all_time'
+    limit = params[:limit] ? params[:limit].to_i : 12
     
-    # If no game IDs found, fallback to top games by likes
+    top_game_ids = GameScoreService.top_game_ids(limit: limit, time_period: time_period)
+    
+    # If no game IDs found, fallback to top games by likes with time period
     if top_game_ids.empty?
-      top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
+      likes_query = GameLike
+      if time_period != 'all_time'
+        date_threshold = case time_period
+        when 'this_week'
+          1.week.ago
+        when 'this_month'
+          1.month.ago
+        when 'this_year'
+          1.year.ago
+        end
+        likes_query = likes_query.where("created_at >= ?", date_threshold) if date_threshold
+      end
+      top_game_ids = likes_query.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(limit)
     end
     
     # If still empty, return empty array instead of error
@@ -44,7 +60,7 @@ class Api::GamesController < ApplicationController
     
     fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
     where_clause = "where id = (#{top_game_ids.join(',')});"
-    games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: 6)
+    games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: limit)
 
     if games && games.any?
       scores = GameScoreService.scores_for(top_game_ids)

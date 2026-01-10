@@ -1,12 +1,38 @@
 class GameScoreService
   # Returns an array of game IDs sorted by popularity score
   # Optimized to use database aggregation instead of loading all records into memory
-  def self.top_game_ids(limit: 12)
+  def self.top_game_ids(limit: 12, time_period: nil)
+    # Calculate date threshold based on time period
+    date_threshold = case time_period
+    when 'this_week'
+      1.week.ago
+    when 'this_month'
+      1.month.ago
+    when 'this_year'
+      1.year.ago
+    when 'all_time'
+      nil
+    else
+      nil # Default to all time
+    end
+    
     # Use database aggregation with limits to reduce memory usage
-    views = GameView.group(:igdb_game_id).count
-    likes = GameLike.group(:igdb_game_id).count
-    plays = GamePlay.group(:igdb_game_id).count
-    reviews = Review.group(:igdb_game_id).count
+    views_query = GameView
+    likes_query = GameLike
+    plays_query = GamePlay
+    reviews_query = Review
+    
+    if date_threshold
+      views_query = views_query.where("created_at >= ?", date_threshold)
+      likes_query = likes_query.where("created_at >= ?", date_threshold)
+      plays_query = plays_query.where("created_at >= ?", date_threshold)
+      reviews_query = reviews_query.where("created_at >= ?", date_threshold)
+    end
+    
+    views = views_query.group(:igdb_game_id).count
+    likes = likes_query.group(:igdb_game_id).count
+    plays = plays_query.group(:igdb_game_id).count
+    reviews = reviews_query.group(:igdb_game_id).count
 
     # Get all unique game IDs from all sources
     all_game_ids = (views.keys + likes.keys + plays.keys + reviews.keys).uniq

@@ -170,7 +170,7 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.datetime "updated_at", null: false
     t.index ["created_at"], name: "index_reviews_on_created_at"
     t.index ["igdb_game_id"], name: "index_reviews_on_igdb_game_id"
-    t.index ["user_id", "igdb_game_id"], name: "index_reviews_on_user_id_and_igdb_game_id", unique: true
+    t.index ["user_id", "igdb_game_id"], name: "index_reviews_on_user_id_and_igdb_game_id"
     t.index ["user_id"], name: "index_reviews_on_user_id"
   end
 

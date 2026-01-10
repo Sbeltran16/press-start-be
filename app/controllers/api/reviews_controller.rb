@@ -27,34 +27,45 @@ module Api
 
     # GET /api/reviews/popular
     def popular
-      # Get reviews from the past week, ordered by likes count
-      # If no reviews from past week, get all reviews
-      week_ago = 1.week.ago
+      # Get time period from params (this_week, this_month, this_year, all_time)
+      time_period = params[:period] || 'this_week'
+      limit = params[:limit] ? params[:limit].to_i : nil
       
-      # Get all reviews from the past week with their like counts
-      reviews_with_likes = Review.where("created_at >= ?", week_ago)
-                                 .includes(:review_likes, :review_comments, :user)
-                                 .map { |review|
-                                   [review, review.review_likes.size]
-                                 }
-                                 .sort_by { |_, likes_count| -likes_count }
-                                 .first(4)
-                                 .map(&:first)
-
-      # If no reviews from past week, get all reviews ordered by likes
-      if reviews_with_likes.empty?
-        reviews_with_likes = Review.all
-                                   .includes(:review_likes, :review_comments, :user)
-                                   .map { |review|
-                                     [review, review.review_likes.size]
-                                   }
-                                   .sort_by { |_, likes_count| -likes_count }
-                                   .first(4)
-                                   .map(&:first)
+      # Calculate date threshold based on time period
+      date_threshold = case time_period
+      when 'this_week'
+        1.week.ago
+      when 'this_month'
+        1.month.ago
+      when 'this_year'
+        1.year.ago
+      when 'all_time'
+        nil
+      else
+        1.week.ago # Default to this week
       end
+      
+      # Build query based on time period
+      base_query = Review.includes(:review_likes, :review_comments, :user)
+      
+      if date_threshold
+        base_query = base_query.where("created_at >= ?", date_threshold)
+      end
+      
+      # Get all reviews with their like counts, sorted by likes
+      reviews_with_likes = base_query
+                           .map { |review|
+                             [review, review.review_likes.size]
+                           }
+                           .sort_by { |_, likes_count| -likes_count }
+      
+      # Apply limit if specified, otherwise use default of 4 for dashboard
+      # Map to get just the reviews, then apply limit
+      reviews_with_likes = reviews_with_likes.map(&:first)
+      reviews_with_likes = reviews_with_likes.first(limit || 4)
 
       # Log for debugging
-      Rails.logger.info "Popular reviews count: #{reviews_with_likes.size}"
+      Rails.logger.info "Popular reviews count: #{reviews_with_likes.size}, period: #{time_period}"
 
       render json: reviews_with_likes.map { |review|
         serialize_review(review)

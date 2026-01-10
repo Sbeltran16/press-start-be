@@ -11,6 +11,9 @@ class Api::GameListItemsController < ApplicationController
       return render json: { error: "Unauthorized" }, status: :unauthorized
     end
 
+    # Convert to integer to ensure type matching
+    igdb_game_id = igdb_game_id.to_i
+
     # Get the next position
     max_position = @game_list.game_list_items.maximum(:position) || -1
     position = max_position + 1
@@ -39,7 +42,18 @@ class Api::GameListItemsController < ApplicationController
       return render json: { error: "Unauthorized" }, status: :unauthorized
     end
 
-    item = @game_list.game_list_items.find_by(igdb_game_id: igdb_game_id)
+    # Convert to integer to ensure type matching
+    igdb_game_id = igdb_game_id.to_i
+    
+    # Debug: Log what we're looking for
+    Rails.logger.info "Looking for game_list_item: game_list_id=#{@game_list.id}, igdb_game_id=#{igdb_game_id} (#{igdb_game_id.class})"
+    
+    # Debug: Log all items in this list (query directly to avoid association scopes)
+    all_items = GameListItem.where(game_list_id: @game_list.id).pluck(:id, :igdb_game_id)
+    Rails.logger.info "All items in list #{@game_list.id}: #{all_items.inspect}"
+    
+    # Query directly on the table to avoid any association scope issues
+    item = GameListItem.find_by(game_list_id: @game_list.id, igdb_game_id: igdb_game_id)
 
     if item
       item.destroy
@@ -49,6 +63,7 @@ class Api::GameListItemsController < ApplicationController
       end
       render json: { success: true }, status: :ok
     else
+      Rails.logger.warn "GameListItem not found: game_list_id=#{@game_list.id}, igdb_game_id=#{igdb_game_id}"
       render json: { error: "Game not found in list" }, status: :not_found
     end
   end
