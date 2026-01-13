@@ -119,4 +119,154 @@ class IgdbService
     []
   end
 
+  def self.fetch_news(limit: 10)
+    # IGDB Pulse News has been discontinued, so we'll parse RSS feeds manually using Nokogiri
+    require 'net/http'
+    require 'nokogiri'
+    
+    news_items = []
+    
+    # Gaming news RSS feeds
+    rss_feeds = [
+      { url: 'https://www.ign.com/feeds/games/all', name: 'IGN' },
+      { url: 'https://www.gamespot.com/feeds/news/', name: 'GameSpot' },
+      { url: 'https://www.polygon.com/rss/index.xml', name: 'Polygon' }
+    ]
+    
+    rss_feeds.each do |feed|
+      begin
+        uri = URI(feed[:url])
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl = true
+        http.read_timeout = 10
+        http.open_timeout = 10
+        
+        request_path = uri.path.empty? ? '/' : uri.path
+        request_path += "?#{uri.query}" if uri.query
+        
+        response = http.get(request_path, { 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' })
+        
+        if response.code.to_i == 200
+          doc = Nokogiri::XML(response.body)
+          items_per_feed = (limit.to_f / rss_feeds.length).ceil
+          
+          doc.xpath('//item').first(items_per_feed).each do |item|
+            title_elem = item.at_xpath('title')
+            title = title_elem ? title_elem.text.to_s.strip : 'Untitled'
+            
+            desc_elem = item.at_xpath('description')
+            description = desc_elem ? desc_elem.text.to_s.strip : ''
+            
+            link_elem = item.at_xpath('link')
+            link = link_elem ? link_elem.text.to_s.strip : ''
+            
+            pub_date_elem = item.at_xpath('pubDate')
+            pub_date = pub_date_elem ? pub_date_elem.text.to_s : nil
+            
+            # Parse date
+            published_at = begin
+              Time.parse(pub_date).to_i if pub_date && !pub_date.empty?
+            rescue
+              Time.now.to_i
+            end || Time.now.to_i
+            
+            # Try multiple methods to extract image
+            image_url = nil
+            
+            # Method 1: Check for media:content (common in RSS feeds)
+            media_content = item.at_xpath('media:content', 'media' => 'http://search.yahoo.com/mrss/')
+            if media_content && media_content['url']
+              image_url = media_content['url']
+            end
+            
+            # Method 2: Check for enclosure with image type
+            if image_url.nil?
+              enclosure = item.at_xpath('enclosure')
+              if enclosure && enclosure['type'] && enclosure['type'].start_with?('image/')
+                image_url = enclosure['url']
+              end
+            end
+            
+            # Method 3: Check for media:thumbnail
+            if image_url.nil?
+              media_thumbnail = item.at_xpath('media:thumbnail', 'media' => 'http://search.yahoo.com/mrss/')
+              if media_thumbnail && media_thumbnail['url']
+                image_url = media_thumbnail['url']
+              end
+            end
+            
+            # Method 4: Extract from description HTML
+            if image_url.nil?
+              image_url = extract_image_from_html(description)
+            end
+            
+            # Method 5: Try to get og:image from the article URL (async, but we'll try synchronously for now)
+            # This is a fallback - we'll skip it for now to keep it fast
+            
+            # Generate ID from link
+            item_id = link.empty? ? rand(1000000) : link.hash.abs
+            
+            news_items << {
+              id: item_id,
+              title: title,
+              summary: strip_html_tags(description),
+              url: link,
+              image_url: image_url,
+              published_at: published_at,
+              author: nil,
+              source: feed[:name]
+            }
+          end
+        end
+      rescue => e
+        Rails.logger.error("RSS Feed Error (#{feed[:url]}): #{e.message}")
+        Rails.logger.error("Backtrace: #{e.backtrace.first(3).join("\n")}")
+        next
+      end
+    end
+    
+    # Sort by published_at and limit
+    news_items.sort_by { |item| -item[:published_at] }.first(limit)
+  rescue => e
+    Rails.logger.error("Gaming News Error: #{e.message}")
+    Rails.logger.error("Backtrace: #{e.backtrace.first(5).join("\n")}")
+    []
+  end
+  
+  def self.extract_image_from_html(html)
+    return nil unless html
+    
+    # Look for img tags with src attribute
+    img_match = html.match(/<img[^>]+src=["']([^"']+)["']/i)
+    if img_match
+      img_url = img_match[1]
+      # Clean up the URL (remove query params that might be for sizing)
+      img_url = img_url.split('?').first if img_url.include?('?')
+      return img_url if img_url.match?(/\.(jpg|jpeg|png|gif|webp)/i)
+    end
+    
+    # Look for data-src (lazy loaded images)
+    data_src_match = html.match(/<img[^>]+data-src=["']([^"']+)["']/i)
+    if data_src_match
+      img_url = data_src_match[1]
+      img_url = img_url.split('?').first if img_url.include?('?')
+      return img_url if img_url.match?(/\.(jpg|jpeg|png|gif|webp)/i)
+    end
+    
+    # Look for og:image meta tag
+    og_match = html.match(/property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    return og_match[1] if og_match
+    
+    # Look for meta name="image"
+    meta_match = html.match(/<meta[^>]+name=["']image["'][^>]+content=["']([^"']+)["']/i)
+    return meta_match[1] if meta_match
+    
+    nil
+  end
+  
+  def self.strip_html_tags(html)
+    return '' unless html
+    html.gsub(/<[^>]*>/, '').gsub(/&nbsp;/, ' ').gsub(/&amp;/, '&').gsub(/&lt;/, '<').gsub(/&gt;/, '>').gsub(/&quot;/, '"').gsub(/&#39;/, "'").strip
+  end
+
 end

@@ -36,6 +36,9 @@ Rails.application.routes.draw do
     #Platform Logos
     get "platform_logos", to: "platform_logos#index"
 
+    #News Routes
+    get "news", to: "news#index"
+
     #Game Routes
     get 'top_games', to: 'games#top'
     get 'games', to: 'games#show_by_name'
