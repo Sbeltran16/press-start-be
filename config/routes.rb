@@ -45,6 +45,7 @@ Rails.application.routes.draw do
     get 'games/search', to: 'games#search_by_name'
     get 'popular', to: 'games#popular'
     get 'user_game_status', to: 'games#user_game_status'
+    get 'games/stats', to: 'games#stats'
     get 'games/batch', to: 'games#batch'
     get 'games/:id', to: 'games#show_by_id'
     get 'igdb/external_games/:id', to: 'external_games#show'

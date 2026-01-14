@@ -1,5 +1,5 @@
 class Api::GamesController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id]
+  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id, :stats]
   before_action :authenticate_user!, only: [:user_game_status]
   require 'net/http'
   require 'json'
@@ -16,6 +16,21 @@ class Api::GamesController < ApplicationController
       played = false
     end
     render json: { liked: liked, played: played }
+  end
+
+  def stats
+    igdb_game_id = params[:igdb_game_id] || params[:id]
+    return render json: { plays: 0, likes: 0 }, status: :ok if igdb_game_id.blank?
+
+    # Both game_likes and game_plays store igdb_game_id as string
+    # Convert to string to ensure consistent querying
+    game_id = igdb_game_id.to_s
+    
+    # Use count for accurate numbers
+    plays_count = GamePlay.where(igdb_game_id: game_id).count
+    likes_count = GameLike.where(igdb_game_id: game_id).count
+
+    render json: { plays: plays_count, likes: likes_count }, status: :ok
   end
  # Game Index
   def index
