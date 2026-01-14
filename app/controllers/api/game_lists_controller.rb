@@ -42,7 +42,7 @@ class Api::GameListsController < ApplicationController
 
     if game_list.save
       render json: {
-        data: GameListSerializer.new(game_list).serializable_hash[:data][:attributes]
+        data: GameListSerializer.new(game_list, { params: { current_user: current_user } }).serializable_hash[:data][:attributes]
       }, status: :created
     else
       render json: { errors: game_list.errors.full_messages }, status: :unprocessable_entity
@@ -52,7 +52,7 @@ class Api::GameListsController < ApplicationController
   def update
     if @game_list.update(game_list_params)
       render json: {
-        data: GameListSerializer.new(@game_list).serializable_hash[:data][:attributes]
+        data: GameListSerializer.new(@game_list, { params: { current_user: current_user } }).serializable_hash[:data][:attributes]
       }
     else
       render json: { errors: @game_list.errors.full_messages }, status: :unprocessable_entity

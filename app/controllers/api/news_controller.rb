@@ -1,5 +1,7 @@
 module Api
   class NewsController < ApplicationController
+    skip_before_action :authenticate_user!
+
     # GET /api/news
     def index
       limit = params[:limit] ? params[:limit].to_i : 20
