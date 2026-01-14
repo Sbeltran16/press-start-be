@@ -7,10 +7,10 @@ module Api
       limit = params[:limit] ? params[:limit].to_i : 20
       page = params[:page] ? params[:page].to_i : 1
       
-      # Fetch more news than needed for pagination
-      all_news = IgdbService.fetch_news(limit: 100) # Fetch up to 100 articles
+      # Fetch all available news articles (no limit)
+      all_news = IgdbService.fetch_news(limit: nil)
       
-      # If no page parameter, return simple array for backward compatibility
+      # If no page parameter, return simple array for backward compatibility (dashboard)
       unless params[:page]
         render json: all_news.first(limit), status: :ok
         return

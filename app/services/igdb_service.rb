@@ -119,118 +119,143 @@ class IgdbService
     []
   end
 
-  def self.fetch_news(limit: 10)
+  def self.fetch_news(limit: nil)
     # IGDB Pulse News has been discontinued, so we'll parse RSS feeds manually using Nokogiri
     require 'net/http'
     require 'nokogiri'
     
     news_items = []
     
-    # Gaming news RSS feeds
+    # Gaming news RSS feeds - multiple feeds per source to get more articles
     rss_feeds = [
       { url: 'https://www.ign.com/feeds/games/all', name: 'IGN' },
+      { url: 'https://www.ign.com/feeds/news', name: 'IGN' },
       { url: 'https://www.gamespot.com/feeds/news/', name: 'GameSpot' },
-      { url: 'https://www.polygon.com/rss/index.xml', name: 'Polygon' }
+      { url: 'https://www.gamespot.com/feeds/games/', name: 'GameSpot' },
+      { url: 'https://www.polygon.com/rss/index.xml', name: 'Polygon' },
+      { url: 'https://www.polygon.com/rss/games/index.xml', name: 'Polygon' },
+      { url: 'https://kotaku.com/rss', name: 'Kotaku' },
+      { url: 'https://www.pcgamer.com/rss/', name: 'PC Gamer' },
+      { url: 'https://www.eurogamer.net/feed', name: 'Eurogamer' },
+      { url: 'https://www.gameinformer.com/feeds/thefeed.aspx', name: 'Game Informer' }
     ]
     
-    rss_feeds.each do |feed|
-      begin
-        uri = URI(feed[:url])
-        http = Net::HTTP.new(uri.host, uri.port)
-        http.use_ssl = true
-        http.read_timeout = 10
-        http.open_timeout = 10
-        
-        request_path = uri.path.empty? ? '/' : uri.path
-        request_path += "?#{uri.query}" if uri.query
-        
-        response = http.get(request_path, { 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' })
-        
-        if response.code.to_i == 200
-          doc = Nokogiri::XML(response.body)
-          items_per_feed = (limit.to_f / rss_feeds.length).ceil
+    # Fetch all feeds in parallel using threads for better performance
+    threads = rss_feeds.map do |feed|
+      Thread.new do
+        begin
+          uri = URI(feed[:url])
+          http = Net::HTTP.new(uri.host, uri.port)
+          http.use_ssl = true
+          http.read_timeout = 5  # Reduced timeout for faster failure
+          http.open_timeout = 5  # Reduced timeout for faster failure
           
-          doc.xpath('//item').first(items_per_feed).each do |item|
-            title_elem = item.at_xpath('title')
-            title = title_elem ? title_elem.text.to_s.strip : 'Untitled'
+          request_path = uri.path.empty? ? '/' : uri.path
+          request_path += "?#{uri.query}" if uri.query
+          
+          response = http.get(request_path, { 'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' })
+          
+          if response.code.to_i == 200
+            doc = Nokogiri::XML(response.body)
+            # Fetch all items from each feed (RSS feeds typically have 20-50 items)
+            # Don't limit per feed - get everything available
             
-            desc_elem = item.at_xpath('description')
-            description = desc_elem ? desc_elem.text.to_s.strip : ''
-            
-            # Extract actual product URLs from description HTML
-            product_urls = extract_product_urls(description)
-            
-            link_elem = item.at_xpath('link')
-            link = link_elem ? link_elem.text.to_s.strip : ''
-            
-            pub_date_elem = item.at_xpath('pubDate')
-            pub_date = pub_date_elem ? pub_date_elem.text.to_s : nil
-            
-            # Parse date
-            published_at = begin
-              Time.parse(pub_date).to_i if pub_date && !pub_date.empty?
-            rescue
-              Time.now.to_i
-            end || Time.now.to_i
-            
-            # Try multiple methods to extract image
-            image_url = nil
-            
-            # Method 1: Check for media:content (common in RSS feeds)
-            media_content = item.at_xpath('media:content', 'media' => 'http://search.yahoo.com/mrss/')
-            if media_content && media_content['url']
-              image_url = media_content['url']
-            end
-            
-            # Method 2: Check for enclosure with image type
-            if image_url.nil?
-              enclosure = item.at_xpath('enclosure')
-              if enclosure && enclosure['type'] && enclosure['type'].start_with?('image/')
-                image_url = enclosure['url']
+            feed_items = []
+            doc.xpath('//item').each do |item|
+              title_elem = item.at_xpath('title')
+              title = title_elem ? title_elem.text.to_s.strip : 'Untitled'
+              
+              desc_elem = item.at_xpath('description')
+              description = desc_elem ? desc_elem.text.to_s.strip : ''
+              
+              # Extract actual product URLs from description HTML
+              product_urls = extract_product_urls(description)
+              
+              link_elem = item.at_xpath('link')
+              link = link_elem ? link_elem.text.to_s.strip : ''
+              
+              pub_date_elem = item.at_xpath('pubDate')
+              pub_date = pub_date_elem ? pub_date_elem.text.to_s : nil
+              
+              # Parse date
+              published_at = begin
+                Time.parse(pub_date).to_i if pub_date && !pub_date.empty?
+              rescue
+                Time.now.to_i
+              end || Time.now.to_i
+              
+              # Try multiple methods to extract image
+              image_url = nil
+              
+              # Method 1: Check for media:content (common in RSS feeds)
+              media_content = item.at_xpath('media:content', 'media' => 'http://search.yahoo.com/mrss/')
+              if media_content && media_content['url']
+                image_url = media_content['url']
               end
-            end
-            
-            # Method 3: Check for media:thumbnail
-            if image_url.nil?
-              media_thumbnail = item.at_xpath('media:thumbnail', 'media' => 'http://search.yahoo.com/mrss/')
-              if media_thumbnail && media_thumbnail['url']
-                image_url = media_thumbnail['url']
+              
+              # Method 2: Check for enclosure with image type
+              if image_url.nil?
+                enclosure = item.at_xpath('enclosure')
+                if enclosure && enclosure['type'] && enclosure['type'].start_with?('image/')
+                  image_url = enclosure['url']
+                end
               end
+              
+              # Method 3: Check for media:thumbnail
+              if image_url.nil?
+                media_thumbnail = item.at_xpath('media:thumbnail', 'media' => 'http://search.yahoo.com/mrss/')
+                if media_thumbnail && media_thumbnail['url']
+                  image_url = media_thumbnail['url']
+                end
+              end
+              
+              # Method 4: Extract from description HTML
+              if image_url.nil?
+                image_url = extract_image_from_html(description)
+              end
+              
+              # Generate ID from link
+              item_id = link.empty? ? rand(1000000) : link.hash.abs
+              
+              feed_items << {
+                id: item_id,
+                title: title,
+                summary: strip_html_tags(description),
+                url: link,
+                image_url: image_url,
+                published_at: published_at,
+                author: nil,
+                source: feed[:name],
+                product_urls: product_urls
+              }
             end
-            
-            # Method 4: Extract from description HTML
-            if image_url.nil?
-              image_url = extract_image_from_html(description)
-            end
-            
-            # Method 5: Try to get og:image from the article URL (async, but we'll try synchronously for now)
-            # This is a fallback - we'll skip it for now to keep it fast
-            
-            # Generate ID from link
-            item_id = link.empty? ? rand(1000000) : link.hash.abs
-            
-            news_items << {
-              id: item_id,
-              title: title,
-              summary: strip_html_tags(description),
-              url: link,
-              image_url: image_url,
-              published_at: published_at,
-              author: nil,
-              source: feed[:name],
-              product_urls: product_urls
-            }
+            feed_items
+          else
+            []
           end
+        rescue => e
+          Rails.logger.error("RSS Feed Error (#{feed[:url]}): #{e.message}")
+          Rails.logger.error("Backtrace: #{e.backtrace.first(3).join("\n")}")
+          []
         end
-      rescue => e
-        Rails.logger.error("RSS Feed Error (#{feed[:url]}): #{e.message}")
-        Rails.logger.error("Backtrace: #{e.backtrace.first(3).join("\n")}")
-        next
       end
     end
     
-    # Sort by published_at and limit
-    news_items.sort_by { |item| -item[:published_at] }.first(limit)
+    # Collect results from all threads
+    threads.each do |thread|
+      thread.join
+      feed_items = thread.value
+      news_items.concat(feed_items) if feed_items.is_a?(Array)
+    end
+    
+    # Remove duplicates based on URL (same article from different feeds)
+    unique_items = news_items.uniq { |item| item[:url] }
+    
+    # Sort by published_at (newest first)
+    sorted_items = unique_items.sort_by { |item| -item[:published_at] }
+    
+    # Only apply limit if specified (for dashboard use)
+    limit ? sorted_items.first(limit) : sorted_items
   rescue => e
     Rails.logger.error("Gaming News Error: #{e.message}")
     Rails.logger.error("Backtrace: #{e.backtrace.first(5).join("\n")}")
