@@ -157,6 +157,9 @@ class IgdbService
             desc_elem = item.at_xpath('description')
             description = desc_elem ? desc_elem.text.to_s.strip : ''
             
+            # Extract actual product URLs from description HTML
+            product_urls = extract_product_urls(description)
+            
             link_elem = item.at_xpath('link')
             link = link_elem ? link_elem.text.to_s.strip : ''
             
@@ -214,7 +217,8 @@ class IgdbService
               image_url: image_url,
               published_at: published_at,
               author: nil,
-              source: feed[:name]
+              source: feed[:name],
+              product_urls: product_urls
             }
           end
         end
@@ -264,9 +268,83 @@ class IgdbService
     nil
   end
   
+  def self.extract_product_urls(html)
+    return {} unless html
+    
+    urls = {}
+    
+    # Common retailer domains mapped to their display names
+    retailer_domains = {
+      'amazon.com' => 'Amazon',
+      'amzn.to' => 'Amazon',
+      'gamestop.com' => 'GameStop',
+      'bestbuy.com' => 'Best Buy',
+      'target.com' => 'Target',
+      'walmart.com' => 'Walmart',
+      'steampowered.com' => 'Steam',
+      'epicgames.com' => 'Epic Games',
+      'playstation.com' => 'PlayStation Store',
+      'xbox.com' => 'Xbox Store',
+      'nintendo.com' => 'Nintendo eShop'
+    }
+    
+    # First, look for href attributes in links (most reliable)
+    html.scan(/href=["'](https?:\/\/[^"']+)["']/i) do |match|
+      url = match[0]
+      retailer_domains.each do |domain, name|
+        if url.include?(domain)
+          # Check if it's a product URL (not just homepage or search)
+          is_homepage = url.match?(/#{domain}\/?$/) || url.match?(/#{domain}\/\?/)
+          is_search = url.include?('/search') || url.include?('/s?')
+          
+          unless is_homepage || is_search
+            # It's likely a product page - use the first one found for each retailer
+            urls[name] = url unless urls[name]
+            break
+          end
+        end
+      end
+    end
+    
+    # Also extract standalone URLs from text (fallback)
+    url_pattern = /https?:\/\/(?:www\.)?([^\s<>"']+)/i
+    html.scan(url_pattern) do |match|
+      full_url = match[0].start_with?('http') ? match[0] : "https://#{match[0]}"
+      retailer_domains.each do |domain, name|
+        if full_url.include?(domain) && !urls[name]
+          is_homepage = full_url.match?(/#{domain}\/?$/) || full_url.match?(/#{domain}\/\?/)
+          is_search = full_url.include?('/search') || full_url.include?('/s?')
+          
+          unless is_homepage || is_search
+            urls[name] = full_url
+            break
+          end
+        end
+      end
+    end
+    
+    urls
+  end
+  
   def self.strip_html_tags(html)
     return '' unless html
-    html.gsub(/<[^>]*>/, '').gsub(/&nbsp;/, ' ').gsub(/&amp;/, '&').gsub(/&lt;/, '<').gsub(/&gt;/, '>').gsub(/&quot;/, '"').gsub(/&#39;/, "'").strip
+    
+    # Replace block-level elements with newlines to preserve paragraph structure
+    html = html.gsub(/<\/?(p|div|br|li|ul|ol|h[1-6])[^>]*>/i, "\n")
+    # Replace other HTML tags
+    html = html.gsub(/<[^>]*>/, '')
+    # Decode HTML entities
+    html = html.gsub(/&nbsp;/, ' ')
+    html = html.gsub(/&amp;/, '&')
+    html = html.gsub(/&lt;/, '<')
+    html = html.gsub(/&gt;/, '>')
+    html = html.gsub(/&quot;/, '"')
+    html = html.gsub(/&#39;/, "'")
+    html = html.gsub(/&apos;/, "'")
+    # Clean up multiple newlines and whitespace
+    html = html.gsub(/\n\s*\n\s*\n+/, "\n\n")
+    html = html.gsub(/[ \t]+/, ' ')
+    html.strip
   end
 
 end
