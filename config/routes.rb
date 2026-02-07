@@ -47,6 +47,12 @@ Rails.application.routes.draw do
     get 'user_game_status', to: 'games#user_game_status'
     get 'games/stats', to: 'games#stats'
     get 'games/batch', to: 'games#batch'
+    get 'games/by_genre', to: 'games#by_genre'
+    get 'games/by_year', to: 'games#by_year'
+    get 'games/by_decade', to: 'games#by_decade'
+    get 'games/by_console', to: 'games#by_console'
+    get 'games/most_popular_igdb', to: 'games#most_popular_igdb'
+    get 'games/most_anticipated_igdb', to: 'games#most_anticipated_igdb'
     get 'games/:id', to: 'games#show_by_id'
     get 'igdb/external_games/:id', to: 'external_games#show'
 
@@ -63,6 +69,7 @@ Rails.application.routes.draw do
     resources :game_lists, only: [:index, :show, :create, :update, :destroy] do
       collection do
         get 'popular', to: 'game_lists#popular'
+        get 'from_friends', to: 'game_lists#from_friends'
       end
       post 'items', to: 'game_list_items#create'
       delete 'items', to: 'game_list_items#destroy'
@@ -78,6 +85,7 @@ Rails.application.routes.draw do
     resources :reviews, only: [:index, :create, :show, :update, :destroy] do
       collection do
         get 'popular', to: 'reviews#popular'
+        get 'from_friends', to: 'reviews#from_friends'
       end
       resources :review_comments, only: [:index, :create, :destroy], path: 'comments'
       post 'like', to: 'review_likes#create'

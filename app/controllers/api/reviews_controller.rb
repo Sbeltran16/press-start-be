@@ -1,6 +1,6 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!, only: [:create, :update, :destroy]
+    before_action :authenticate_user!, only: [:create, :update, :destroy, :from_friends]
 
     # GET /api/users/:id/reviews
     def user_reviews
@@ -70,6 +70,27 @@ module Api
       render json: reviews_with_likes.map { |review|
         serialize_review(review)
       }, status: :ok
+    end
+
+    # GET /api/reviews/from_friends
+    # Returns newest reviews from users the current user follows (and optionally themself)
+    def from_friends
+      limit = params[:limit] ? params[:limit].to_i : 4
+      limit = 4 if limit <= 0
+
+      following_ids = current_user.following.pluck(:id)
+
+      if following_ids.empty?
+        render json: [], status: :ok
+        return
+      end
+
+      reviews = Review.where(user_id: following_ids)
+                      .includes(:review_likes, :review_comments, :user)
+                      .order(created_at: :desc)
+                      .limit(limit)
+
+      render json: reviews.map { |review| serialize_review(review) }, status: :ok
     end
 
     # GET /api/reviews/:id

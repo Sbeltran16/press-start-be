@@ -1,5 +1,5 @@
 class Api::GamesController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id, :stats]
+  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id, :stats, :by_genre, :by_year, :by_console, :by_decade, :most_popular_igdb, :most_anticipated_igdb]
   before_action :authenticate_user!, only: [:user_game_status]
   require 'net/http'
   require 'json'
@@ -289,6 +289,289 @@ class Api::GamesController < ApplicationController
       render json: game
     else
       render json: { error: "Game not found" }, status: :not_found
+    end
+  end
+
+  def by_genre
+    genre = params[:genre]
+    return render json: { error: 'Missing genre parameter' }, status: :bad_request if genre.blank?
+
+    # Map genre name to IGDB genre ID (common genres)
+    # IGDB genre IDs: https://api-docs.igdb.com/#genre-ids
+    genre_map = {
+      'Action' => 4,
+      'Adventure' => 31,
+      'RPG' => 12,
+      'Strategy' => 15,
+      'Simulation' => 13,
+      'Sports' => 14,
+      'Racing' => 10,
+      'Shooter' => 5,
+      'Puzzle' => 9,
+      'Indie' => 32
+    }
+
+    genre_id = genre_map[genre] || genre_map[genre.capitalize]
+    return render json: [], status: :ok unless genre_id
+
+    # Fetch games - no rating requirement to get maximum results
+    # Games with multiple genres will be included if they have this genre in their genres array
+    # The = operator in IGDB checks if the value is in the array, so games with multiple genres work
+    # Include genres field to verify the query is working
+    fields = "id, name, cover.image_id, first_release_date, rating, aggregated_rating, summary, genres"
+    
+    # Query: games that have this genre in their genres array (supports multiple genres)
+    # In IGDB API v4, use the = operator with parentheses for array membership
+    # This will return games that have this genre, even if they have other genres too
+    # The correct syntax is: genres = (6) for Fighting genre
+    where_clause = "where genres = (#{genre_id}) & cover != null;"
+    
+    Rails.logger.info("Fetching games for genre: #{genre} (ID: #{genre_id}) with query: #{where_clause}")
+    
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 500  # Fetch more to ensure we have enough games
+    )
+    
+
+    if games && games.any?
+      Rails.logger.info("Found #{games.length} games for genre: #{genre} (ID: #{genre_id})")
+      
+      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      # Games without ratings will be sorted to the end
+      sorted_games = games.sort_by do |game|
+        # Use aggregated_rating (0-100 scale) if available, otherwise use rating (0-100 scale)
+        rating = game["aggregated_rating"] || game["rating"] || -1 # -1 for games without ratings
+        -rating # Negative for descending order
+      end
+      
+      # Return top 100 most popular games
+      result = sorted_games.take(100)
+      Rails.logger.info("Returning #{result.length} games for genre: #{genre}")
+      render json: result
+    else
+      # Log for debugging
+      Rails.logger.warn("No games found for genre: #{genre} (ID: #{genre_id}) - games was: #{games.inspect}")
+      render json: [], status: :ok
+    end
+  end
+
+  def by_year
+    year = params[:year]&.to_i
+    return render json: { error: 'Missing or invalid year parameter' }, status: :bad_request if year.blank? || year < 1970 || year > 2100
+
+    # Calculate Unix timestamps for the year
+    start_timestamp = Time.utc(year, 1, 1).to_i
+    end_timestamp = Time.utc(year + 1, 1, 1).to_i - 1
+
+    fields = "id, name, cover.image_id, first_release_date, rating, aggregated_rating, summary"
+    where_clause = "where first_release_date >= #{start_timestamp} & first_release_date < #{end_timestamp} & cover != null & rating != null;"
+    
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 200
+    )
+
+    if games && games.any?
+      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      sorted_games = games.sort_by do |game|
+        rating = game["aggregated_rating"] || game["rating"] || 0
+        -rating # Negative for descending order
+      end
+      
+      # Return top 100 most popular games
+      render json: sorted_games.take(100)
+    else
+      render json: [], status: :ok
+    end
+  end
+
+  def by_console
+    console_name = params[:console]
+    return render json: { error: 'Missing console parameter' }, status: :bad_request if console_name.blank?
+
+    # Map console name to IGDB platform ID
+    platform_map = {
+      'PlayStation 5' => 167,
+      'Xbox Series X' => 169,
+      'Nintendo Switch' => 130,
+      'PlayStation 4' => 48,
+      'Xbox One' => 49,
+      'PC' => 6,
+      'PlayStation 3' => 9,
+      'Xbox 360' => 12,
+      'Wii U' => 41,
+      'Nintendo 3DS' => 37,
+      'PlayStation Vita' => 46,
+      'Wii' => 5
+    }
+
+    platform_id = platform_map[console_name] || platform_map[console_name.strip]
+    return render json: [], status: :ok unless platform_id
+
+    fields = "id, name, cover.image_id, first_release_date, rating, aggregated_rating, summary"
+    where_clause = "where platforms = (#{platform_id}) & cover != null & rating != null;"
+    
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 200
+    )
+
+    if games && games.any?
+      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      sorted_games = games.sort_by do |game|
+        rating = game["aggregated_rating"] || game["rating"] || 0
+        -rating # Negative for descending order
+      end
+      
+      # Return top 100 most popular games
+      render json: sorted_games.take(100)
+    else
+      render json: [], status: :ok
+    end
+  end
+
+  def by_decade
+    start_year = params[:start_year]&.to_i
+    end_year = params[:end_year]&.to_i
+    return render json: { error: 'Missing or invalid year parameters' }, status: :bad_request if start_year.blank? || end_year.blank? || start_year < 1970 || end_year > 2100
+
+    # Calculate Unix timestamps for the decade range
+    start_timestamp = Time.utc(start_year, 1, 1).to_i
+    end_timestamp = Time.utc(end_year + 1, 1, 1).to_i - 1
+
+    fields = "id, name, cover.image_id, first_release_date, rating, aggregated_rating, summary"
+    where_clause = "where first_release_date >= #{start_timestamp} & first_release_date <= #{end_timestamp} & cover != null & rating != null;"
+    
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 200
+    )
+
+    if games && games.any?
+      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      sorted_games = games.sort_by do |game|
+        rating = game["aggregated_rating"] || game["rating"] || 0
+        -rating # Negative for descending order
+      end
+      
+      # Return top 100 most popular games
+      render json: sorted_games.take(100)
+    else
+      render json: [], status: :ok
+    end
+  end
+
+  def most_popular_igdb
+    # Fetch most popular games directly from IGDB (not from app database)
+    # Use IGDB's native sorting by popularity field
+    fields = "id, name, cover.image_id, first_release_date, rating, aggregated_rating, summary, popularity, follows"
+    
+    # Get games with covers - no other restrictions to get maximum results
+    where_clause = "where cover != null;"
+    
+    # Use IGDB's native sorting - sort by popularity descending
+    sort_clause = "popularity desc"
+    
+    Rails.logger.info("Fetching most popular games from IGDB with query: #{where_clause}, sort: #{sort_clause}")
+    
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 100,
+      sort: sort_clause
+    )
+
+    if games && games.any?
+      Rails.logger.info("Found #{games.length} popular games from IGDB")
+      render json: games
+    else
+      Rails.logger.warn("No popular games found from IGDB, trying fallback without sort")
+      # Fallback: try without sort and sort in Ruby
+      games = IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: where_clause,
+        limit: 500
+      )
+      
+      if games && games.any?
+        sorted_games = games.sort_by do |game|
+          popularity = game["popularity"] || 0
+          follows = game["follows"] || 0
+          rating = game["aggregated_rating"] || game["rating"] || 0
+          [-popularity, -follows, -rating]
+        end
+        result = sorted_games.take(100)
+        Rails.logger.info("Returning #{result.length} most popular games (fallback)")
+        render json: result
+      else
+        render json: [], status: :ok
+      end
+    end
+  end
+
+  def most_anticipated_igdb
+    # Fetch most anticipated games directly from IGDB (not from app database)
+    # These are games with future release dates, sorted by hypes (most anticipated)
+    current_timestamp = Time.now.to_i
+    future_timestamp = Time.now.to_i + (365 * 24 * 60 * 60 * 5) # 5 years in the future
+    
+    fields = "id, name, cover.image_id, first_release_date, rating, aggregated_rating, summary, hypes, follows"
+    
+    # Get games with future release dates and covers
+    # Use hypes field which indicates how many people are hyped/anticipating the game
+    where_clause = "where cover != null & first_release_date > #{current_timestamp} & first_release_date < #{future_timestamp};"
+    
+    # Use IGDB's native sorting - sort by hypes descending (most hyped first)
+    sort_clause = "hypes desc"
+    
+    Rails.logger.info("Fetching most anticipated games from IGDB with query: #{where_clause}, sort: #{sort_clause}")
+    Rails.logger.info("Current timestamp: #{current_timestamp}, Future timestamp: #{future_timestamp}")
+    
+    games = IgdbService.fetch_games(
+      query: "",
+      fields: fields,
+      where_clause: where_clause,
+      limit: 100,
+      sort: sort_clause
+    )
+
+    if games && games.any?
+      Rails.logger.info("Found #{games.length} anticipated games from IGDB")
+      render json: games
+    else
+      Rails.logger.warn("No anticipated games found from IGDB, trying fallback without sort")
+      # Fallback: try without sort and sort in Ruby
+      games = IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: where_clause,
+        limit: 500
+      )
+      
+      if games && games.any?
+        sorted_games = games.sort_by do |game|
+          hypes = game["hypes"] || 0
+          follows = game["follows"] || 0
+          release_date = game["first_release_date"] || 9999999999
+          [-hypes, -follows, release_date]
+        end
+        result = sorted_games.take(100)
+        Rails.logger.info("Returning #{result.length} most anticipated games (fallback)")
+        render json: result
+      else
+        render json: [], status: :ok
+      end
     end
   end
 end

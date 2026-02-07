@@ -1,5 +1,5 @@
 class IgdbService
-  def self.fetch_games(query:, fields:, where_clause:, limit: 12)
+  def self.fetch_games(query:, fields:, where_clause:, limit: 12, sort: nil)
     token = fetch_access_token
     uri = URI("https://api.igdb.com/v4/games")
     http = Net::HTTP.new(uri.host, uri.port)
@@ -14,6 +14,7 @@ class IgdbService
       fields #{fields};
       #{query}
       #{where_clause}
+      #{sort ? "sort #{sort};" : ""}
       limit #{limit};
     BODY
 
