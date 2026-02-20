@@ -73,7 +73,7 @@ class Api::GamesController < ApplicationController
       return
     end
     
-    fields = "id, name, cover.image_id, artworks.image_id, rating, summary"
+    fields = "id, name, cover.image_id, artworks.image_id, screenshots.image_id, rating, summary"
     where_clause = "where id = (#{top_game_ids.join(',')});"
     games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: limit)
 
@@ -103,7 +103,7 @@ class Api::GamesController < ApplicationController
     top_game_ids = GameLike.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(12)
     Rails.logger.info("Top game IDs from database: #{top_game_ids.length}")
 
-    fields = "name, cover.image_id, artworks.image_id, updated_at, summary, release_dates, rating, genres.name"
+    fields = "name, cover.image_id, artworks.image_id, screenshots.image_id, updated_at, summary, release_dates, rating, genres.name"
     
     # If no game likes exist, fetch popular games from IGDB directly
     if top_game_ids.empty?
@@ -332,7 +332,7 @@ class Api::GamesController < ApplicationController
       query: "",
       fields: fields,
       where_clause: where_clause,
-      limit: 500  # Fetch more to ensure we have enough games
+      limit: 500  # Fetch more to ensure we have enough games to sort and return 300
     )
     
 
@@ -347,8 +347,8 @@ class Api::GamesController < ApplicationController
         -rating # Negative for descending order
       end
       
-      # Return top 100 most popular games
-      result = sorted_games.take(100)
+      # Return top 300 most popular games (for mobile app)
+      result = sorted_games.take(300)
       Rails.logger.info("Returning #{result.length} games for genre: #{genre}")
       render json: result
     else
@@ -383,8 +383,8 @@ class Api::GamesController < ApplicationController
         -rating # Negative for descending order
       end
       
-      # Return top 100 most popular games
-      render json: sorted_games.take(100)
+      # Return top 300 most popular games (for mobile app)
+      render json: sorted_games.take(300)
     else
       render json: [], status: :ok
     end
@@ -420,7 +420,7 @@ class Api::GamesController < ApplicationController
       query: "",
       fields: fields,
       where_clause: where_clause,
-      limit: 200
+      limit: 500  # Fetch more to ensure we have enough games to sort and return 300
     )
 
     if games && games.any?
@@ -430,8 +430,8 @@ class Api::GamesController < ApplicationController
         -rating # Negative for descending order
       end
       
-      # Return top 100 most popular games
-      render json: sorted_games.take(100)
+      # Return top 300 most popular games (for mobile app)
+      render json: sorted_games.take(300)
     else
       render json: [], status: :ok
     end
@@ -453,7 +453,7 @@ class Api::GamesController < ApplicationController
       query: "",
       fields: fields,
       where_clause: where_clause,
-      limit: 200
+      limit: 500  # Fetch more to ensure we have enough games to sort and return 300
     )
 
     if games && games.any?
@@ -463,8 +463,8 @@ class Api::GamesController < ApplicationController
         -rating # Negative for descending order
       end
       
-      # Return top 100 most popular games
-      render json: sorted_games.take(100)
+      # Return top 300 most popular games (for mobile app)
+      render json: sorted_games.take(300)
     else
       render json: [], status: :ok
     end
