@@ -16,11 +16,18 @@ class ActivitiesController < ApplicationController
                              .order(created_at: :desc)
                              .limit(20)
                              .map do |review|
+        custom_cover_url = nil
+        if review.custom_cover.attached?
+          path = Rails.application.routes.url_helpers.rails_blob_path(review.custom_cover, only_path: true)
+          custom_cover_url = request.base_url + path
+        end
         {
           type: "review",
           message: "#{review.user.username} reviewed a game",
           review_id: review.id,
           igdb_game_id: review.igdb_game_id,
+          cover_image_id: review.cover_image_id,
+          custom_cover_url: custom_cover_url,
           rating: review.rating,
           content: review.comment,
           username: review.user.username,
@@ -36,11 +43,18 @@ class ActivitiesController < ApplicationController
                              .order(created_at: :desc)
                              .limit(20)
                              .map do |review|
+        custom_cover_url = nil
+        if review.custom_cover.attached?
+          path = Rails.application.routes.url_helpers.rails_blob_path(review.custom_cover, only_path: true)
+          custom_cover_url = request.base_url + path
+        end
         {
           type: "review",
           message: "#{review.user.username} reviewed a game",
           review_id: review.id,
           igdb_game_id: review.igdb_game_id,
+          cover_image_id: review.cover_image_id,
+          custom_cover_url: custom_cover_url,
           rating: review.rating,
           content: review.comment,
           username: review.user.username,

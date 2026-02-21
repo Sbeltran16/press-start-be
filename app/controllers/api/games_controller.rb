@@ -1,5 +1,5 @@
 class Api::GamesController < ApplicationController
-  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id, :stats, :by_genre, :by_year, :by_console, :by_decade, :most_popular_igdb, :most_anticipated_igdb]
+  skip_before_action :authenticate_user!, only: [:index, :popular, :top, :show_by_name, :show_by_id, :stats, :by_genre, :by_year, :by_console, :by_decade, :most_popular_igdb, :most_anticipated_igdb, :alternative_covers]
   before_action :authenticate_user!, only: [:user_game_status]
   require 'net/http'
   require 'json'
@@ -290,6 +290,14 @@ class Api::GamesController < ApplicationController
     else
       render json: { error: "Game not found" }, status: :not_found
     end
+  end
+
+  def alternative_covers
+    igdb_game_id = params[:id]
+    return render json: { error: 'Missing game ID' }, status: :bad_request if igdb_game_id.blank?
+
+    covers = IgdbService.fetch_game_covers(igdb_game_id)
+    render json: covers
   end
 
   def by_genre

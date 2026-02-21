@@ -1,6 +1,6 @@
 module Api
   class ReviewsController < ApplicationController
-    before_action :authenticate_user!, only: [:create, :update, :destroy, :from_friends]
+    before_action :authenticate_user!, only: [:create, :update, :destroy, :from_friends, :upload_cover]
 
     # GET /api/users/:id/reviews
     def user_reviews
@@ -101,7 +101,30 @@ module Api
 
     # POST /api/reviews
     def create
-      review = current_user.reviews.build(review_params)
+      review_params_data = review_params.except(:custom_cover_url, :custom_cover_blob_key)
+      review = current_user.reviews.build(review_params_data)
+      
+      # Handle custom cover - attach the blob if blob_key or URL is provided
+      if params[:review][:custom_cover_blob_key].present?
+        # Use blob_key directly (more reliable)
+        blob = ActiveStorage::Blob.find_by(key: params[:review][:custom_cover_blob_key])
+        review.custom_cover.attach(blob) if blob
+      elsif params[:review][:custom_cover_url].present?
+        # Fallback to URL parsing
+        custom_cover_url = params[:review][:custom_cover_url]
+        begin
+          url_path = URI.parse(custom_cover_url).path
+          # Extract blob key from path (format: /rails/active_storage/blobs/:key/:filename)
+          if url_path.include?('/rails/active_storage/blobs/')
+            blob_key = url_path.split('/rails/active_storage/blobs/').last.split('/').first
+            blob = ActiveStorage::Blob.find_by(key: blob_key)
+            review.custom_cover.attach(blob) if blob
+          end
+        rescue => e
+          Rails.logger.error("Error attaching custom cover: #{e.message}")
+        end
+      end
+      
       if review.save
         render json: serialize_review(review), status: :created
       else
@@ -119,7 +142,48 @@ module Api
         return
       end
 
-      if review.update(review_params)
+      review_params_data = review_params.except(:custom_cover_url, :custom_cover_blob_key)
+      
+      # Handle custom cover changes
+      if params[:review][:custom_cover_blob_key].present?
+        # User selected a new custom cover (uploaded) - attach the blob
+        blob = ActiveStorage::Blob.find_by(key: params[:review][:custom_cover_blob_key])
+        if blob
+          review.custom_cover.purge if review.custom_cover.attached? # Remove old custom cover
+          review.custom_cover.attach(blob)
+        end
+        # Clear cover_image_id when custom cover is set
+        review_params_data[:cover_image_id] = nil if params[:review][:cover_image_id] == ""
+      elsif params[:review][:custom_cover_url].present? && params[:review][:custom_cover_blob_key].blank?
+        # User selected existing custom cover or provided URL - find blob from URL
+        custom_cover_url = params[:review][:custom_cover_url]
+        begin
+          url_path = URI.parse(custom_cover_url).path
+          if url_path.include?('/rails/active_storage/blobs/')
+            blob_key = url_path.split('/rails/active_storage/blobs/').last.split('/').first
+            blob = ActiveStorage::Blob.find_by(key: blob_key)
+            if blob
+              # Only update if it's different from current
+              current_blob_key = review.custom_cover.attached? ? review.custom_cover.blob.key : nil
+              if current_blob_key != blob_key
+                review.custom_cover.purge if review.custom_cover.attached?
+                review.custom_cover.attach(blob)
+              end
+            end
+          end
+        rescue => e
+          Rails.logger.error("Error attaching custom cover from URL: #{e.message}")
+        end
+        # Clear cover_image_id when custom cover is set
+        review_params_data[:cover_image_id] = nil if params[:review][:cover_image_id] == ""
+      elsif params[:review][:cover_image_id].present? || params[:review][:cover_image_id] == ""
+        # User selected an IGDB cover or explicitly cleared - clear custom cover
+        if params[:review][:cover_image_id] == ""
+          review.custom_cover.purge if review.custom_cover.attached?
+        end
+      end
+
+      if review.update(review_params_data)
         render json: serialize_review(review), status: :ok
       else
         render json: { errors: review.errors.full_messages }, status: :unprocessable_entity
@@ -140,19 +204,52 @@ module Api
       render json: { message: "Review deleted" }, status: :ok
     end
 
+    # POST /api/reviews/upload_cover
+    def upload_cover
+      unless params[:cover]
+        render json: { errors: ["No file provided"] }, status: :bad_request
+        return
+      end
+
+      # Create a blob directly
+      blob = ActiveStorage::Blob.create_and_upload!(
+        io: params[:cover],
+        filename: params[:cover].original_filename,
+        content_type: params[:cover].content_type
+      )
+      
+      # Return the URL
+      url = Rails.application.routes.url_helpers.rails_blob_path(blob, only_path: true)
+      full_url = request.base_url + url
+      
+      render json: { url: full_url, blob_key: blob.key }, status: :ok
+    rescue => e
+      Rails.logger.error("Cover upload error: #{e.message}")
+      render json: { errors: [e.message] }, status: :internal_server_error
+    end
+
     private
 
     def review_params
-      params.require(:review).permit(:comment, :rating, :igdb_game_id)
+      params.require(:review).permit(:comment, :rating, :igdb_game_id, :cover_image_id, :custom_cover, :custom_cover_url, :custom_cover_blob_key)
     end
 
     # Centralized serializer for plain JSON
     def serialize_review(review)
+      custom_cover_url = nil
+      if review.custom_cover.attached?
+        # Return full URL for custom cover
+        path = Rails.application.routes.url_helpers.rails_blob_path(review.custom_cover, only_path: true)
+        custom_cover_url = request.base_url + path
+      end
+      
       {
         id: review.id,
         comment: review.comment,
         rating: review.rating,
         igdb_game_id: review.igdb_game_id,
+        cover_image_id: review.cover_image_id,
+        custom_cover_url: custom_cover_url,
         likes_count: review.review_likes.size,
         liked_by_current_user: current_user ? review.review_likes.exists?(user_id: current_user.id) : false,
         comments_count: review.review_comments.size,

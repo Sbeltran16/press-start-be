@@ -53,6 +53,7 @@ Rails.application.routes.draw do
     get 'games/by_console', to: 'games#by_console'
     get 'games/most_popular_igdb', to: 'games#most_popular_igdb'
     get 'games/most_anticipated_igdb', to: 'games#most_anticipated_igdb'
+    get 'games/:id/alternative_covers', to: 'games#alternative_covers'
     get 'games/:id', to: 'games#show_by_id'
     get 'igdb/external_games/:id', to: 'external_games#show'
 
@@ -86,6 +87,7 @@ Rails.application.routes.draw do
       collection do
         get 'popular', to: 'reviews#popular'
         get 'from_friends', to: 'reviews#from_friends'
+        post 'upload_cover', to: 'reviews#upload_cover'
       end
       resources :review_comments, only: [:index, :create, :destroy], path: 'comments'
       post 'like', to: 'review_likes#create'

@@ -373,4 +373,144 @@ class IgdbService
     html.strip
   end
 
+  def self.fetch_game_covers(igdb_game_id)
+    token = fetch_access_token
+    all_images = []
+    
+    # Fetch comprehensive cover options including:
+    # 1. Official game covers (box art, digital covers, special editions)
+    # 2. Promotional artwork (posters, promotional images)
+    # 3. Screenshots (in-game captures that can work as covers)
+    
+    # 1. Fetch ALL covers (official game covers) - these include box art, digital covers, special editions
+    covers = fetch_covers_for_game(token, igdb_game_id)
+    all_images.concat(covers.map { |c| { 'image_id' => c['image_id'], 'type' => 'cover' } })
+    
+    # 2. Fetch ALL artworks (promotional artwork, posters, soundtrack covers, etc.)
+    # These often include promotional posters, soundtrack artwork, and special edition artwork
+    artworks = fetch_artworks_for_game(token, igdb_game_id)
+    all_images.concat(artworks.map { |a| { 'image_id' => a['image_id'], 'type' => 'artwork' } })
+    
+    # 3. Fetch screenshots (in-game screenshots) - these can sometimes work as alternative covers
+    screenshots = fetch_screenshots_for_game(token, igdb_game_id)
+    all_images.concat(screenshots.map { |s| { 'image_id' => s['image_id'], 'type' => 'screenshot' } })
+    
+    # Remove duplicates based on image_id, but prioritize covers
+    # Sort so covers come first, then artworks, then screenshots
+    unique_images = all_images.uniq { |img| img['image_id'] }
+    sorted_images = unique_images.sort_by do |img|
+      case img['type']
+      when 'cover'
+        0
+      when 'artwork'
+        1
+      when 'screenshot'
+        2
+      else
+        3
+      end
+    end
+    
+    # Remove the 'type' field before returning (keep it simple)
+    result = sorted_images.map { |img| { 'image_id' => img['image_id'] } }
+    
+    Rails.logger.info("Fetched #{result.length} unique images for game ID #{igdb_game_id} (#{covers.length} covers, #{artworks.length} artworks, #{screenshots.length} screenshots)")
+    
+    result
+  rescue => e
+    Rails.logger.error("IGDB fetch_game_covers Error: #{e.message}")
+    Rails.logger.error("Backtrace: #{e.backtrace.first(5).join("\n")}")
+    []
+  end
+  
+  def self.fetch_covers_for_game(token, igdb_game_id)
+    uri = URI("https://api.igdb.com/v4/covers")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = ENV['TWITCH_CLIENT_ID']
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+
+    body = <<~BODY
+      fields image_id, game;
+      where game = #{igdb_game_id};
+      limit 500;
+    BODY
+
+    request.body = body.strip
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      JSON.parse(response.body)
+    else
+      Rails.logger.error("IGDB Covers Error: HTTP #{response.code} - #{response.body}")
+      []
+    end
+  rescue => e
+    Rails.logger.error("IGDB fetch_covers_for_game Error: #{e.message}")
+    []
+  end
+  
+  def self.fetch_artworks_for_game(token, igdb_game_id)
+    uri = URI("https://api.igdb.com/v4/artworks")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = ENV['TWITCH_CLIENT_ID']
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+
+    body = <<~BODY
+      fields image_id, game;
+      where game = #{igdb_game_id};
+      limit 500;
+    BODY
+
+    request.body = body.strip
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      JSON.parse(response.body)
+    else
+      Rails.logger.error("IGDB Artworks Error: HTTP #{response.code} - #{response.body}")
+      []
+    end
+  rescue => e
+    Rails.logger.error("IGDB fetch_artworks_for_game Error: #{e.message}")
+    []
+  end
+  
+  def self.fetch_screenshots_for_game(token, igdb_game_id)
+    uri = URI("https://api.igdb.com/v4/screenshots")
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+
+    request = Net::HTTP::Post.new(uri.path)
+    request["Client-ID"] = ENV['TWITCH_CLIENT_ID']
+    request["Authorization"] = "Bearer #{token}"
+    request["Content-Type"] = "text/plain"
+
+    body = <<~BODY
+      fields image_id, game;
+      where game = #{igdb_game_id};
+      limit 500;
+    BODY
+
+    request.body = body.strip
+    response = http.request(request)
+
+    if response.code.to_i == 200
+      JSON.parse(response.body)
+    else
+      Rails.logger.error("IGDB Screenshots Error: HTTP #{response.code} - #{response.body}")
+      []
+    end
+  rescue => e
+    Rails.logger.error("IGDB fetch_screenshots_for_game Error: #{e.message}")
+    []
+  end
+
 end
