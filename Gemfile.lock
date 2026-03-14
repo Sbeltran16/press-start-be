@@ -103,6 +103,7 @@ GEM
     bootsnap (1.18.4)
       msgpack (~> 1.2)
     builder (3.3.0)
+    chronic (0.10.2)
     concurrent-ruby (1.3.5)
     connection_pool (2.5.3)
     crass (1.0.6)
@@ -175,6 +176,8 @@ GEM
       logger
     mini_mime (1.1.5)
     minitest (5.25.5)
+    mocha (3.0.2)
+      ruby2_keywords (>= 0.0.5)
     msgpack (1.8.0)
     mutex_m (0.3.0)
     net-imap (0.5.8)
@@ -264,6 +267,7 @@ GEM
     ruby-vips (2.2.4)
       ffi (~> 1.12)
       logger
+    ruby2_keywords (0.0.5)
     securerandom (0.4.1)
     sprockets (4.2.2)
       concurrent-ruby (~> 1.0)
@@ -289,6 +293,8 @@ GEM
       base64
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
+    whenever (1.1.2)
+      chronic (>= 0.6.3)
     zeitwerk (2.7.2)
 
 PLATFORMS
@@ -312,12 +318,14 @@ DEPENDENCIES
   dotenv-rails
   image_processing
   jsonapi-serializer
+  mocha
   pg (~> 1.1)
   puma (>= 5.0)
   rack-cors
   rails (~> 7.1.5)
   sprockets-rails
   tzinfo-data
+  whenever
 
 RUBY VERSION
    ruby 3.3.0p0

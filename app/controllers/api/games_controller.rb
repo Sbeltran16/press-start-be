@@ -32,68 +32,65 @@ class Api::GamesController < ApplicationController
 
     render json: { plays: plays_count, likes: likes_count }, status: :ok
   end
- # Game Index
+  # Game Index: returns cached games only (optional name filter)
   def index
-    if params[:name]
-      @games = Game.where("name ILIKE ?", "%#{params[:name]}%")
+    if params[:name].present?
+      games = Game.where("name ILIKE ?", "%#{params[:name]}%").limit(100)
+      render json: games.map(&:to_igdb_response)
     else
-      @games = Game.all
+      render json: []
     end
-
-    render json: @games
   end
 
   def popular
-    # Get time period from params (this_week, this_month, this_year, all_time)
     time_period = params[:period] || 'all_time'
     limit = params[:limit] ? params[:limit].to_i : 12
-    
+
     top_game_ids = GameScoreService.top_game_ids(limit: limit, time_period: time_period)
-    
-    # If no game IDs found, fallback to top games by likes with time period
     if top_game_ids.empty?
       likes_query = GameLike
       if time_period != 'all_time'
         date_threshold = case time_period
-        when 'this_week'
-          1.week.ago
-        when 'this_month'
-          1.month.ago
-        when 'this_year'
-          1.year.ago
+        when 'this_week' then 1.week.ago
+        when 'this_month' then 1.month.ago
+        when 'this_year' then 1.year.ago
         end
         likes_query = likes_query.where("created_at >= ?", date_threshold) if date_threshold
       end
       top_game_ids = likes_query.group(:igdb_game_id).order('count_id DESC').count(:id).keys.take(limit)
     end
-    
-    # If still empty, return empty array instead of error
+
     if top_game_ids.empty?
       render json: []
       return
     end
-    
-    fields = "id, name, cover.image_id, artworks.image_id, screenshots.image_id, rating, summary"
-    where_clause = "where id = (#{top_game_ids.join(',')});"
-    games = IgdbService.fetch_games(query: "", fields: fields, where_clause: where_clause, limit: limit)
 
-    if games && games.any?
-      scores = GameScoreService.scores_for(top_game_ids)
+    ids = top_game_ids.map(&:to_i)
+    fields = "id, name, cover.image_id, artworks.image_id, screenshots.image_id, rating, summary"
+    games = GameCacheService.find_or_fetch_batch(ids) do |missing_ids|
+      IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: "where id = (#{missing_ids.join(',')});",
+        limit: missing_ids.size
+      )
+    end
+
+    if games.any?
+      scores = GameScoreService.scores_for(ids)
       games_with_scores = games.map do |game|
         game["score"] = scores[game["id"]] || 0
         game
       end
       render json: games_with_scores
     else
-      # Return empty array instead of error for better UX
       render json: []
     end
   end
 
   def top
     Rails.logger.info("Top games endpoint called")
-    
-    # Check if IGDB credentials are configured
+
     unless ENV['TWITCH_CLIENT_ID'] && ENV['TWITCH_CLIENT_SECRET']
       Rails.logger.error("IGDB credentials not configured")
       render json: { error: "IGDB API not configured" }, status: :service_unavailable
@@ -104,69 +101,59 @@ class Api::GamesController < ApplicationController
     Rails.logger.info("Top game IDs from database: #{top_game_ids.length}")
 
     fields = "name, cover.image_id, artworks.image_id, screenshots.image_id, updated_at, summary, release_dates, rating, genres.name"
-    
-    # If no game likes exist, fetch popular games from IGDB directly
+
     if top_game_ids.empty?
       Rails.logger.info("No game likes found, fetching from IGDB")
-      # Fetch popular games from IGDB (highly rated games with covers)
-      # Use a broader query that's more likely to return results
       games = IgdbService.fetch_games(
         query: "",
         fields: fields,
         where_clause: "where rating >= 75 & cover != null & first_release_date > 946684800;",
         limit: 12
       )
-      
       if games && games.any?
-        Rails.logger.info("IGDB returned #{games.length} games")
-        # Sort by rating descending, then by release date
+        GameCacheService.upsert_many_from_igdb(games)
         games = games.sort_by { |g| [-(g["rating"] || 0), -(g["first_release_date"] || 0)] }
         render json: games
+        return
+      end
+      fallback_games = IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: "where cover != null & rating != null;",
+        limit: 12
+      )
+      if fallback_games && fallback_games.any?
+        GameCacheService.upsert_many_from_igdb(fallback_games)
+        fallback_games = fallback_games.sort_by { |g| -(g["rating"] || 0) }
+        render json: fallback_games
       else
-        Rails.logger.warn("First IGDB query returned no games, trying fallback")
-        # Try an even simpler query as last resort
-        fallback_games = IgdbService.fetch_games(
-          query: "",
-          fields: fields,
-          where_clause: "where cover != null & rating != null;",
-          limit: 12
-        )
-        
-        if fallback_games && fallback_games.any?
-          Rails.logger.info("Fallback IGDB query returned #{fallback_games.length} games")
-          fallback_games = fallback_games.sort_by { |g| -(g["rating"] || 0) }
-          render json: fallback_games
-        else
-          Rails.logger.error("All IGDB queries returned no games")
-          render json: []
-        end
+        render json: []
       end
       return
     end
 
-    where_clause = "where id = (#{top_game_ids.join(',')});"
+    ids = top_game_ids.map(&:to_i)
+    games = GameCacheService.find_or_fetch_batch(ids) do |missing_ids|
+      IgdbService.fetch_games(
+        query: "",
+        fields: fields,
+        where_clause: "where id = (#{missing_ids.join(',')});",
+        limit: missing_ids.size
+      )
+    end
 
-    games = IgdbService.fetch_games(
-      query: "",
-      fields: fields,
-      where_clause: where_clause,
-      limit: 12
-    )
-
-    if games && games.any?
+    if games.any?
       render json: games
     else
-      # Fallback to popular IGDB games if database games fail
       fallback_games = IgdbService.fetch_games(
         query: "",
         fields: fields,
         where_clause: "where rating >= 80 & cover != null;",
         limit: 12
       )
-      
       if fallback_games && fallback_games.any?
-        fallback_games = fallback_games.sort_by { |g| -(g["rating"] || 0) }
-        render json: fallback_games
+        GameCacheService.upsert_many_from_igdb(fallback_games)
+        render json: fallback_games.sort_by { |g| -(g["rating"] || 0) }
       else
         render json: []
       end
@@ -178,7 +165,6 @@ class Api::GamesController < ApplicationController
     return render json: { error: 'Missing name parameter' }, status: :bad_request if name.blank?
 
     decoded_name = CGI.unescape(name)
-
     fields = %w[
       name cover.image_id summary rating aggregated_rating first_release_date
       storyline genres.name platforms.name release_dates.human artworks.image_id
@@ -187,15 +173,17 @@ class Api::GamesController < ApplicationController
       age_ratings.rating age_ratings.category
     ].join(", ")
 
-    games = IgdbService.fetch_games(
-      query: "search \"#{decoded_name}\";",
-      fields: fields,
-      where_clause: "where cover != null;",
-      limit: 40
-    )
+    game = GameCacheService.find_or_fetch_by_name(decoded_name) do
+      IgdbService.fetch_games(
+        query: "search \"#{decoded_name}\";",
+        fields: fields,
+        where_clause: "where cover != null;",
+        limit: 40
+      )
+    end
 
-    if games&.any?
-      render json: games.first
+    if game.present?
+      render json: game
     else
       render json: { error: "Game not found" }, status: :not_found
     end
@@ -209,13 +197,16 @@ class Api::GamesController < ApplicationController
 
     games = IgdbService.fetch_games(
       query: "search \"#{decoded_name}\";",
-      fields: "name, cover.image_id, summary, rating, first_release_date",
+      fields: "id, name, cover.image_id, summary, rating, first_release_date",
       where_clause: "",
       limit: 50
     )
 
-    if games
+    if games && games.any?
+      GameCacheService.upsert_many_from_igdb(games)
       render json: games
+    elsif games
+      render json: []
     else
       render json: { error: "Failed to fetch games" }, status: :bad_request
     end
@@ -226,66 +217,53 @@ class Api::GamesController < ApplicationController
     game_ids = params[:ids]
     return render json: { error: 'Missing ids parameter' }, status: :bad_request if game_ids.blank?
 
-    # Parse comma-separated IDs or array
     ids = if game_ids.is_a?(Array)
             game_ids.map(&:to_i)
           else
             game_ids.to_s.split(',').map(&:to_i).reject(&:zero?)
           end
+    ids = ids.uniq.take(50)
+    return render json: {}, status: :ok if ids.empty?
 
-    return render json: [], status: :ok if ids.empty?
-
-    # Limit to prevent abuse
-    ids = ids.take(50)
-
-    fields = %w[
-      id name cover.image_id summary aggregated_rating first_release_date
-      storyline genres.name game_engines.name platforms.name release_dates.human
-      artworks.image_id screenshots.image_id language_supports.language.name
-      videos.video_id videos.name involved_companies.company.name
-      similar_games.name similar_games.cover.image_id similar_games.first_release_date
-      age_ratings.rating age_ratings.category
-    ].join(", ")
-
-    where_clause = "where id = (#{ids.join(',')});"
-    games = IgdbService.fetch_games(
-      query: "",
-      fields: fields,
-      where_clause: where_clause,
-      limit: ids.length
-    )
-
-    if games
-      # Return as hash keyed by ID for easy lookup
-      games_hash = games.index_by { |game| game["id"] }
-      render json: games_hash
-    else
-      render json: {}, status: :ok
+    games_array = GameCacheService.find_or_fetch_batch(ids) do |missing_ids|
+      IgdbService.fetch_games(
+        query: "",
+        fields: GameCacheService::FULL_GAME_FIELDS,
+        where_clause: "where id = (#{missing_ids.join(',')});",
+        limit: missing_ids.size
+      )
     end
+
+    games_hash = games_array.index_by { |g| g["id"] }
+    render json: games_hash
   end
 
   def show_by_id
     igdb_game_id = params[:id]
+    return render json: { error: "Game not found" }, status: :not_found if igdb_game_id.blank?
 
-    fields = %w[
-      name cover.image_id summary aggregated_rating first_release_date
-      storyline genres.name game_engines.name platforms.name release_dates.human
-      artworks.image_id screenshots.image_id language_supports.language.name
-      videos.video_id videos.name involved_companies.company.name
-      similar_games.name similar_games.cover.image_id similar_games.first_release_date
-      age_ratings.rating age_ratings.category
-    ].join(", ")
+    game = GameCacheService.find_or_fetch_by_id(igdb_game_id) do
+      IgdbService.fetch_games(
+        query: "",
+        fields: GameCacheService::FULL_GAME_FIELDS,
+        where_clause: "where id = #{igdb_game_id.to_i};",
+        limit: 1
+      )
+    end
 
-    games = IgdbService.fetch_games(
-      query: "",
-      fields: fields,
-      where_clause: "where id = #{igdb_game_id};",
-      limit: 1
-    )
-    if games&.first
-      game = games.first
-      steam_url = IgdbService.fetch_steam_url(igdb_game_id)
-      game["steam_url"] = steam_url if steam_url
+    if game.present?
+      # If cached game is thin (missing details/screenshots/videos), enrich from IGDB
+      if GameCacheService.thin?(game)
+        game = GameCacheService.enrich_game(igdb_game_id) || game
+      end
+      # Fill and persist steam_url and external_links (where to buy) when missing
+      if game["steam_url"].blank? || game["external_links"].blank?
+        steam_url = game["steam_url"].presence || IgdbService.fetch_steam_url(igdb_game_id)
+        external_links = game["external_links"].presence || IgdbService.fetch_external_links_formatted(igdb_game_id)
+        game["steam_url"] = steam_url if steam_url.present?
+        game["external_links"] = external_links if external_links.present?
+        GameCacheService.update_external_data(igdb_game_id, steam_url: steam_url, external_links: external_links)
+      end
       render json: game
     else
       render json: { error: "Game not found" }, status: :not_found
@@ -345,10 +323,8 @@ class Api::GamesController < ApplicationController
     
 
     if games && games.any?
+      GameCacheService.upsert_many_from_igdb(games)
       Rails.logger.info("Found #{games.length} games for genre: #{genre} (ID: #{genre_id})")
-      
-      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
-      # Games without ratings will be sorted to the end
       sorted_games = games.sort_by do |game|
         # Use aggregated_rating (0-100 scale) if available, otherwise use rating (0-100 scale)
         rating = game["aggregated_rating"] || game["rating"] || -1 # -1 for games without ratings
@@ -385,13 +361,11 @@ class Api::GamesController < ApplicationController
     )
 
     if games && games.any?
-      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      GameCacheService.upsert_many_from_igdb(games)
       sorted_games = games.sort_by do |game|
         rating = game["aggregated_rating"] || game["rating"] || 0
-        -rating # Negative for descending order
+        -rating
       end
-      
-      # Return top 300 most popular games (for mobile app)
       render json: sorted_games.take(300)
     else
       render json: [], status: :ok
@@ -432,13 +406,11 @@ class Api::GamesController < ApplicationController
     )
 
     if games && games.any?
-      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      GameCacheService.upsert_many_from_igdb(games)
       sorted_games = games.sort_by do |game|
         rating = game["aggregated_rating"] || game["rating"] || 0
-        -rating # Negative for descending order
+        -rating
       end
-      
-      # Return top 300 most popular games (for mobile app)
       render json: sorted_games.take(300)
     else
       render json: [], status: :ok
@@ -465,13 +437,11 @@ class Api::GamesController < ApplicationController
     )
 
     if games && games.any?
-      # Sort by rating (descending) - use aggregated_rating if available, fallback to rating
+      GameCacheService.upsert_many_from_igdb(games)
       sorted_games = games.sort_by do |game|
         rating = game["aggregated_rating"] || game["rating"] || 0
-        -rating # Negative for descending order
+        -rating
       end
-      
-      # Return top 300 most popular games (for mobile app)
       render json: sorted_games.take(300)
     else
       render json: [], status: :ok
@@ -500,6 +470,7 @@ class Api::GamesController < ApplicationController
     )
 
     if games && games.any?
+      GameCacheService.upsert_many_from_igdb(games)
       Rails.logger.info("Found #{games.length} popular games from IGDB")
       render json: games
     else
@@ -513,15 +484,14 @@ class Api::GamesController < ApplicationController
       )
       
       if games && games.any?
+        GameCacheService.upsert_many_from_igdb(games)
         sorted_games = games.sort_by do |game|
           popularity = game["popularity"] || 0
           follows = game["follows"] || 0
           rating = game["aggregated_rating"] || game["rating"] || 0
           [-popularity, -follows, -rating]
         end
-        result = sorted_games.take(100)
-        Rails.logger.info("Returning #{result.length} most popular games (fallback)")
-        render json: result
+        render json: sorted_games.take(100)
       else
         render json: [], status: :ok
       end
@@ -555,6 +525,7 @@ class Api::GamesController < ApplicationController
     )
 
     if games && games.any?
+      GameCacheService.upsert_many_from_igdb(games)
       Rails.logger.info("Found #{games.length} anticipated games from IGDB")
       render json: games
     else
@@ -568,15 +539,14 @@ class Api::GamesController < ApplicationController
       )
       
       if games && games.any?
+        GameCacheService.upsert_many_from_igdb(games)
         sorted_games = games.sort_by do |game|
           hypes = game["hypes"] || 0
           follows = game["follows"] || 0
           release_date = game["first_release_date"] || 9999999999
           [-hypes, -follows, release_date]
         end
-        result = sorted_games.take(100)
-        Rails.logger.info("Returning #{result.length} most anticipated games (fallback)")
-        render json: result
+        render json: sorted_games.take(100)
       else
         render json: [], status: :ok
       end

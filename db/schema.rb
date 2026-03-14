@@ -120,6 +120,18 @@ ActiveRecord::Schema[7.1].define(version: 2025_06_20_100427) do
     t.index ["user_id"], name: "index_game_views_on_user_id"
   end
 
+  create_table "games", force: :cascade do |t|
+    t.bigint "igdb_id", null: false
+    t.string "name", null: false
+    t.string "slug"
+    t.jsonb "data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["igdb_id"], name: "index_games_on_igdb_id", unique: true
+    t.index ["name"], name: "index_games_on_name"
+    t.index ["slug"], name: "index_games_on_slug"
+  end
+
   create_table "list_likes", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "game_list_id", null: false

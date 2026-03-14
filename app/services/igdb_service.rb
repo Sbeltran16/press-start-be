@@ -120,6 +120,46 @@ class IgdbService
     []
   end
 
+  # Returns external links formatted for API/cache: array of { "type" => "steam", "uid" => ..., "url" => ... }
+  ALLOWED_EXTERNAL_SOURCES = [1, 31, 36, 11, 130, 13].freeze
+
+  def self.fetch_external_links_formatted(igdb_game_id)
+    raw = fetch_external_links(igdb_game_id)
+    return [] if raw.blank?
+
+    found_by_type = {}
+    found_urls = Set.new
+    raw.filter_map do |entry|
+      next unless ALLOWED_EXTERNAL_SOURCES.include?(entry["external_game_source"])
+      url = entry["url"].presence || build_platform_url_from_source(entry["external_game_source"], entry["uid"])
+      next unless url.present?
+      normalized = url.gsub(/\/+$/, "").split("?").first.split("#").first
+      next if found_urls.include?(normalized)
+      type = platform_type_from_source(entry["external_game_source"])
+      next if found_by_type[type]
+      found_by_type[type] = true
+      found_urls.add(normalized)
+      { "type" => type, "uid" => entry["uid"], "url" => url }
+    end
+  end
+
+  def self.platform_type_from_source(source)
+    { 1 => "steam", 31 => "xbox", 36 => "playstation", 11 => "epic", 130 => "nintendo", 13 => "gog" }[source] || "other"
+  end
+
+  def self.build_platform_url_from_source(source, uid)
+    return nil unless uid
+    case source
+    when 1 then "https://store.steampowered.com/app/#{uid}/"
+    when 31 then "https://www.xbox.com/en-US/games/store/#{uid}"
+    when 36 then "https://store.playstation.com/en-us/product/#{uid}"
+    when 11 then "https://www.epicgames.com/store/en-US/p/#{uid}"
+    when 130 then "https://www.nintendo.com/store/products/#{uid}/"
+    when 13 then "https://www.gog.com/game/#{uid}"
+    else nil
+    end
+  end
+
   def self.fetch_news(limit: nil)
     # IGDB Pulse News has been discontinued, so we'll parse RSS feeds manually using Nokogiri
     require 'net/http'
